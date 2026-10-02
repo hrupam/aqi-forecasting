@@ -194,13 +194,95 @@ def render_compare():
 
 
 # ------------------------------------------------------------------ view: quick city (no model yet)
-def start_build(city):
+def start_build(city, extra=()):
     log = config.REPORT_DIR / "build.log"
     fh = open(log, "w", encoding="utf-8")
-    proc = subprocess.Popen([sys.executable, "-u", "pipeline.py", "all", "--city", city],
+    proc = subprocess.Popen([sys.executable, "-u", "pipeline.py", "all", "--city", city, *extra],
                             cwd=config.ROOT, stdout=fh, stderr=subprocess.STDOUT,
                             env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     st.session_state.setdefault("builds", {})[city] = proc
+
+
+def build_running(city) -> bool:
+    proc = st.session_state.get("builds", {}).get(city)
+    return proc is not None and proc.poll() is None
+
+
+def build_status(city, running_text):
+    """Shows progress of a background build; returns True while one is running."""
+    proc = st.session_state.get("builds", {}).get(city)
+    log = config.REPORT_DIR / "build.log"
+    tail = lambda n: "\n".join(log.read_text(encoding="utf-8", errors="ignore").splitlines()[-n:]) if log.exists() else ""
+    if proc is None:
+        return False
+    if proc.poll() is None:
+        st.info(running_text)
+        st.code(tail(12) or "starting ...")
+        st.button("Check progress", key=f"progress_{city}")
+        return True
+    st.session_state["builds"].pop(city, None)
+    if proc.returncode == 0:
+        st.cache_data.clear()
+        st.rerun()
+    st.error("The build failed. Last lines of the log:")
+    st.code(tail(25))
+    return False
+
+
+@st.cache_data(ttl=6 * 3600, show_spinner="Listing nearby monitoring stations ...")
+def stations_list(city, lat, lon, _stamp):
+    """One row per station (OpenAQ location), best first. Uses the saved list when the city
+    has been built, otherwise asks OpenAQ."""
+    f = config.DATA_ROOT / config.slug(city) / "raw" / "sensors.csv"
+    if f.exists():
+        s = pd.read_csv(f)
+    elif config.OPENAQ_API_KEY:
+        from aq import openaq
+        s = openaq.find_pm25_sensors(lat, lon, config.SEARCH_RADIUS_M)
+    else:
+        return pd.DataFrame()
+    if s.empty:
+        return s
+    s["last"] = pd.to_datetime(s["last"], utc=True, format="mixed", errors="coerce")
+    g = (s.groupby("location_id", sort=False)
+           .agg(location=("location", "first"), provider=("provider", "first"),
+                is_monitor=("is_monitor", "first"), distance_m=("distance_m", "first"),
+                last=("last", "max"), sensor_id=("sensor_id", "max"), sensors=("sensor_id", list))
+           .reset_index())
+    return g
+
+
+def station_picker(city, current_loc=None, forced=False):
+    """Sidebar selector. Returns (chosen sensor id or None for automatic, changed?)."""
+    c = config.all_cities()[city]
+    f = config.DATA_ROOT / config.slug(city) / "raw" / "sensors.csv"
+    try:
+        g = stations_list(city, c["lat"], c["lon"], _mtime(f))
+    except Exception as e:
+        st.caption(f"Station list unavailable: {e}")
+        return None, False
+    if g.empty:
+        st.caption("No PM2.5 monitors found within 25 km.")
+        return None, False
+    AUTO = "auto"
+
+    def label(v):
+        if v == AUTO:
+            return "Automatic (best available)"
+        r = g[g.location_id == v].iloc[0]
+        age = (now - r["last"]).total_seconds() / 86400 if pd.notna(r["last"]) else np.inf
+        status = "reporting" if age < 1 else (f"silent {age:.0f} days" if np.isfinite(age) else "no data")
+        kind = "" if r.is_monitor else ", low-cost sensor"
+        return f"{r.location} ({(r.distance_m or 0)/1000:.1f} km, {status}{kind})"
+
+    options = [AUTO] + g.location_id.tolist()
+    default = current_loc if (forced and current_loc in options) else AUTO
+    pick = st.selectbox("Station", options, index=options.index(default), format_func=label,
+                        key=f"station_{city}",
+                        help="Automatic picks the best active reference monitor with long history. "
+                             "Choosing a station trains the model on that station's readings.")
+    chosen = None if pick == AUTO else int(g[g.location_id == pick].sensor_id.iloc[0])
+    return chosen, pick != default
 
 
 def render_quick(city):
@@ -298,28 +380,22 @@ def render_quick(city):
     st.subheader(f"Get the full forecast for {city}")
     st.markdown("Downloads this city's station history and weather, trains the model and turns on the "
                 "calibrated 60-hour forecast, probabilities, drivers and track record. Takes about 3–10 minutes.")
-    proc = st.session_state.get("builds", {}).get(city)
-    log = config.REPORT_DIR / "build.log"
     if not config.OPENAQ_API_KEY:
         st.info("Add your free OpenAQ key to `.env` (OPENAQ_API_KEY=...) first.")
-    elif proc is not None and proc.poll() is None:
-        st.info("Building the forecast. You can look at other cities meanwhile.")
-        if log.exists():
-            st.code("\n".join(log.read_text(encoding="utf-8", errors="ignore").splitlines()[-15:]))
-        st.button("Check progress")
-    else:
-        if proc is not None:
-            if proc.returncode == 0:
-                st.success("Done! Reloading with the full forecast ...")
-                st.session_state["builds"].pop(city, None)
-                st.rerun()
-            else:
-                st.error("The build failed - last lines of the log:")
-                st.code("\n".join(log.read_text(encoding="utf-8", errors="ignore").splitlines()[-25:]))
-        if st.button(f"Build forecast for {city}", type="primary"):
-            start_build(city)
-            st.rerun()
-        st.caption(f"Or from a terminal:  python pipeline.py all --city \"{city}\"")
+        return
+    with st.sidebar:
+        st.divider()
+        st.header("Station")
+        chosen, _ = station_picker(city)
+    if build_status(city, "Building the forecast. You can look at other cities meanwhile."):
+        return
+    extra = ["--sensor", str(chosen)] if chosen else ["--auto-station"]
+    where = "the station chosen in the sidebar" if chosen else "the best available station"
+    if st.button(f"Build forecast for {city}", type="primary"):
+        start_build(city, extra)
+        st.rerun()
+    st.caption(f"Uses {where}. From a terminal: python pipeline.py all --city \"{city}\" "
+               + (f"--sensor {chosen}" if chosen else ""))
 
 
 # ------------------------------------------------------------------ routing
@@ -342,8 +418,19 @@ hourly, meta, fc, drivers, backtest, btp = load_all(choice, sum(_mtime(f) for f 
 
 with st.sidebar:
     st.divider()
-    st.caption(f"**Station:** {meta.get('station')}  \n**Provider:** {meta.get('provider')}  \n"
-               f"**Mode:** {meta.get('mode')}")
+    st.header("Station")
+    if meta.get("mode") == "demo":
+        st.caption("Demo data: synthetic station.")
+    else:
+        chosen, changed = station_picker(choice, meta.get("location_id"),
+                                         forced=bool(config.all_cities()[choice].get("sensor_id")))
+        if changed and not build_running(choice):
+            st.caption("Switching retrains this city's model on the selected station (about 3–10 minutes). "
+                       "The current forecast stays visible meanwhile.")
+            if st.button("Use this station", type="primary"):
+                start_build(choice, ["--sensor", str(chosen)] if chosen else ["--auto-station"])
+                st.rerun()
+        st.caption(f"In use: {meta.get('station')} ({meta.get('provider')})")
     if st.button("Refresh data and forecast"):
         args = [sys.executable, "pipeline.py", "update", "--city", choice] + \
                (["--demo"] if meta.get("mode") == "demo" else [])
@@ -356,6 +443,7 @@ with st.sidebar:
             st.error((r.stderr or r.stdout)[-1500:])
 
 # ------------------------------------------------------------------ header
+build_status(choice, "Switching station and retraining. The forecast below is the previous one until this finishes.")
 if meta.get("mode") == "demo":
     st.info("Demo mode: these are synthetic data. Run `python pipeline.py all` with an OpenAQ key for real data.")
 
@@ -388,11 +476,10 @@ st.markdown(ui.hero(
 if fresh.get("bridged") and lag_h > 6:
     st.warning(f"The station has not reported for {lag_h:.0f} h. The missing hours are estimated from the "
                f"CAMS model × {fresh['bridge_ratio']:.2f} (its recent local bias), so the forecast still starts from now. "
-               "Treat it as lower-confidence until the station is back, or switch sensor "
-               f"(python pipeline.py all --city \"{choice}\" --sensor <id>).")
+               "Treat it as lower-confidence until the station is back, or choose another station in the sidebar.")
 elif lag_h > 12:
     st.warning(f"The station's latest reading is {lag_h:.0f} h old, so forecasts further ahead are less reliable. "
-               "Use Refresh in the sidebar, or switch to a sensor that is still reporting.")
+               "Use Refresh in the sidebar, or choose a station that is still reporting.")
 if fc_end <= now:
     st.error(f"This forecast ended at {fc_end.tz_convert(config.LOCAL_TZ):%a %d %b %H:%M} because the station stopped "
              "reporting. Click Refresh in the sidebar: outages under 14 days are bridged with CAMS.")

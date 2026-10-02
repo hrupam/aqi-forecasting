@@ -82,6 +82,15 @@ def register_city(name: str, lat: float, lon: float, tz: str = _IST, **extra) ->
     CITIES_FILE.write_text(json.dumps(reg, indent=2), encoding="utf-8")
 
 
+def set_city_sensor(name: str, sensor_id: int | None) -> None:
+    """Pin a city to the station of `sensor_id`, or go back to automatic choice (None)."""
+    c = dict(all_cities()[name])
+    c.pop("sensor_id", None)
+    if sensor_id:
+        c["sensor_id"] = int(sensor_id)
+    register_city(name, c.pop("lat"), c.pop("lon"), c.pop("tz", _IST), **c)
+
+
 def city_has_forecast(name: str) -> bool:
     return (MODEL_ROOT / slug(name) / "pm25_quantile_gbm.joblib").exists() and \
            (REPORT_ROOT / slug(name) / "forecast.csv").exists()

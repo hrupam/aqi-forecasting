@@ -189,6 +189,7 @@ Add `--demo` to any `pipeline.py` command to use synthetic data.
   * **Who are you planning for?** chooses a profile (general public, sensitive groups, children and elderly, outdoor workers and athletes, WHO-strict). Each profile sets a default threshold.
   * **Warn me when PM2.5 exceeds** fine-tunes that threshold.
   * **Outdoor activity length** sets how long a window to search for.
+* **Station** chooses which monitoring station the city's forecast is trained on (see section 7).
 * **Refresh data and forecast** has the same effect as `python pipeline.py update`.
 
 ### Header (cities with a model)
@@ -229,10 +230,16 @@ A map, a ranking and a table with AQI now, AQI tomorrow and the 48-hour peak for
   python pipeline.py all --city "Shillong" --lat 25.578 --lon 91.893
   ```
   Added places are remembered in `data/cities.json`.
-* **Choose a specific station** if the automatic choice isn't right. Station IDs are listed in `data/<city>/raw/sensors.csv`:
+* **Choose the station from the dashboard.** The sidebar's **Station** list shows every PM2.5 monitor within 25 km, with its distance and whether it is still reporting. Low-cost sensors are marked.
+  * For a city with a forecast, pick a station and click **Use this station**. The model is retrained on that station's readings in the background (about 3–10 minutes), and the current forecast stays visible until it finishes.
+  * Choose **Automatic (best available)** to go back to the automatic choice.
+  * In quick view, the station you pick is the one **Build forecast** will use.
+* **Or choose it from the terminal.** Station IDs are listed in `data/<city>/raw/sensors.csv`:
   ```bat
-  python pipeline.py all --city Kolkata --sensor 12235680
+  python pipeline.py all --city Kolkata --sensor 12235680     # pin this station
+  python pipeline.py all --city Kolkata --auto-station        # back to automatic
   ```
+  A pinned station is remembered in `data/cities.json`.
 * **Each city has its own folders**: `data/<city>/`, `models/<city>/` and `reports/<city>/`.
 * **Default city:** commands without `--city` use `AQ_CITY` from `.env`, or Kolkata if it isn't set.
 
@@ -459,7 +466,7 @@ aqews/
 | `OPENAQ_API_KEY is not set` | Create `.env` with your key (step 3). |
 | PowerShell: *running scripts is disabled* | `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, then activate again. |
 | `'streamlit' is not recognized` | The virtual environment is not active. Run `.venv\Scripts\activate` first. |
-| Warning *"The station has not reported for N h"* | The OpenAQ feed for that station is delayed or down; CPCB feeds sometimes stop for days. Outages under 14 days are bridged with CAMS automatically. Click **Refresh** later, or choose another station with `--sensor`. |
+| Warning *"The station has not reported for N h"* | The OpenAQ feed for that station is delayed or down; CPCB feeds sometimes stop for days. Outages under 14 days are bridged with CAMS automatically. Click **Refresh** later, or pick a station marked "reporting" in the sidebar's **Station** list. |
 | *"None of the nearby OpenAQ stations returned PM2.5 data"* | The feed is down for the whole area, or the place has no monitors. Try again later; quick view still works with CAMS. |
 | *"Model file is from an older version"* | Run `python pipeline.py train --city <city>` once. |
 | **Build forecast** fails in quick view | The last lines of the log are shown on the page (full log in `reports/<city>/build.log`). Run `python pipeline.py all --city "<city>"` in the terminal to see the whole output. |

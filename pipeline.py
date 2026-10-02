@@ -88,7 +88,7 @@ def fetch(demo: bool = False, history: bool = True):
         weather = _combine(wh, openmeteo.fetch_weather_forecast(config.LAT, config.LON))
         cams = _combine(ch, openmeteo.fetch_cams_forecast(config.LAT, config.LON))
         meta = {"mode": "live", "city": config.CITY, "station": st.location, "sensor_id": sensor_ids,
-                "location_id": int(st.location_id),
+                "location_id": int(st.location_id), "station_forced": bool(config.SENSOR_ID),
                 "provider": st.provider, "lat": float(st.lat), "lon": float(st.lon),
                 "city_lat": config.LAT, "city_lon": config.LON, "tz": config.LOCAL_TZ}
 
@@ -145,22 +145,26 @@ def _station_pm25(openaq, sensors: pd.DataFrame, history: bool):
     """Pick the best station that actually has data: ranked stations are tried in turn
     until one gives at least 30 days of readings with the latest within 14 days."""
     sensors = sensors.copy()
-    sensors["last"] = pd.to_datetime(sensors["last"], utc=True)
+    sensors["last"] = pd.to_datetime(sensors["last"], utc=True, format="mixed", errors="coerce")
     if config.SENSOR_ID:
-        forced = sensors[sensors.sensor_id == int(config.SENSOR_ID)]
-        if forced.empty:
+        hit = sensors[sensors.sensor_id == int(config.SENSOR_ID)]
+        if hit.empty:
             print(f"   sensor {config.SENSOR_ID} is not within {config.SEARCH_RADIUS_M/1000:.0f} km - ignoring it")
         else:
+            forced = sensors[sensors.location_id == hit.location_id.iloc[0]]   # all sensors of that station
             st = forced.iloc[0]
+            print(f"[fetch] OpenAQ hourly PM2.5 for the chosen station '{st.location}' "
+                  f"(sensors {forced.sensor_id.tolist()})")
             pm = _fetch_location(openaq, forced, history)
             if pm.empty:
-                raise SystemExit(f"Sensor {config.SENSOR_ID} returned no PM2.5 data - pick another one.")
-            return pm, st, [int(st.sensor_id)]
+                raise SystemExit(f"The chosen station '{st.location}' returned no PM2.5 data - pick another one.")
+            return pm, st, forced.sensor_id.astype(int).tolist()
     order = sensors.drop_duplicates("location_id")["location_id"].tolist()
     # if a station was used before, try it first so history stays consistent
     meta = meta_file()
     if meta.exists():
-        prev = json.loads(meta.read_text()).get("location_id")
+        m = json.loads(meta.read_text())
+        prev = None if m.get("station_forced") else m.get("location_id")
         if prev in order:
             order.remove(prev)
             order.insert(0, prev)
@@ -246,6 +250,8 @@ def main():
     ap.add_argument("--lon", type=float)
     ap.add_argument("--tz", help="IANA time zone for a custom city, e.g. Asia/Kolkata")
     ap.add_argument("--sensor", type=int, help="force a specific OpenAQ PM2.5 sensor id for this city")
+    ap.add_argument("--auto-station", action="store_true",
+                    help="forget a chosen sensor and let the pipeline pick the best station again")
     ap.add_argument("--all-cities", action="store_true", help="run the command for every city that has a model")
     ap.add_argument("--demo", action="store_true", help="use synthetic data (offline)")
     a = ap.parse_args()
@@ -271,9 +277,8 @@ def main():
         if a.lat is not None and a.lon is None:
             ap.error("--lat needs --lon")
         config.set_city(a.city or f"{a.lat:.3f},{a.lon:.3f}", a.lat, a.lon, a.tz)
-    if a.sensor:
-        c = config.all_cities()[config.CITY]
-        config.register_city(config.CITY, c["lat"], c["lon"], c.get("tz"), sensor_id=a.sensor)
+    if a.sensor or a.auto_station:
+        config.set_city_sensor(config.CITY, None if a.auto_station else a.sensor)
         config.set_city(config.CITY)
     run(a.command, a.demo)
 
