@@ -14,18 +14,12 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import config
-from aq import insights as I, live
+from aq import insights as I, live, ui
 from aq.model import exceed_prob
 
-st.set_page_config(page_title="PM2.5 Early Warning", page_icon="🌫️", layout="wide")
+st.set_page_config(page_title="Air Quality Early Warning", page_icon="🌫️", layout="wide")
+ui.inject()
 
-LEVEL_STYLE = {
-    "CLEAR": ("#e8f5e9", "#1b5e20", "✅"),
-    "WATCH": ("#fff8e1", "#8d6e00", "👀"),
-    "WARNING": ("#fff3e0", "#bf360c", "⚠️"),
-    "EMERGENCY": ("#f3e5f5", "#4a148c", "🚨"),
-    "Unknown": ("#eceff1", "#37474f", "❔"),
-}
 
 
 # ------------------------------------------------------------------ cached loaders
@@ -68,15 +62,18 @@ def cams_many_cached(city_tuple):
 
 
 now = pd.Timestamp.now(tz="UTC")
-SEARCH = "🔎 Search any city…"
+SEARCH = "Search for another place…"
 
 # ------------------------------------------------------------------ sidebar: city + settings
 with st.sidebar:
-    st.header("📍 City")
+    st.markdown(ui.brand(), unsafe_allow_html=True)
+    st.header("City")
     view = st.radio("View", ["City dashboard", "Compare cities"], horizontal=True, label_visibility="collapsed")
     all_c = config.all_cities()
     ready = config.cities_with_forecast()
     ordered = ready + sorted(c for c in all_c if c not in ready)
+    if "pending_city" in st.session_state:           # set by "Add this place" before the rerun
+        st.session_state["city_select"] = st.session_state.pop("pending_city")
     if st.session_state.get("city_select") not in ordered + [SEARCH]:
         default = os.environ.get("AQ_CITY", "Kolkata")
         st.session_state["city_select"] = ready[0] if ready else (default if default in ordered else ordered[0])
@@ -96,17 +93,17 @@ with st.sidebar:
                 st.caption("No matches - try another spelling.")
         if res:
             pick = st.radio("Matches", range(len(res)), format_func=lambda i: res[i]["label"])
-            if st.button("➕ Add this place"):
+            if st.button("Add this place"):
                 g = res[pick]
                 name = g["name"]
                 if name in all_c and abs(all_c[name]["lat"] - g["lat"]) + abs(all_c[name]["lon"] - g["lon"]) > 0.1:
                     name = g["label"]                     # same name, different place
                 if name not in all_c:
                     config.register_city(name, g["lat"], g["lon"], g["tz"])
-                st.session_state["city_select"] = name
+                st.session_state["pending_city"] = name
                 st.rerun()
     st.divider()
-    st.header("⚙️ Settings")
+    st.header("Your alert")
     profile = st.selectbox("Who are you planning for?", list(config.PROFILES), index=1)
     threshold = st.slider("Warn me when PM2.5 exceeds (µg/m³)", 15, 250, config.PROFILES[profile], step=5)
     win_len = st.slider("Outdoor activity length (h)", 1, 4, 2)
@@ -134,7 +131,7 @@ def aqi_badge(a, label):
 
 # ------------------------------------------------------------------ view: compare cities
 def render_compare():
-    st.title("🗺️ Compare cities")
+    st.title("Compare cities")
     st.caption("CPCB AQI from 24-hour mean PM2.5 / PM10. Cities with ✅ use our station-trained ML forecast; "
                "others use the CAMS global model (coarser, often biased).")
     cities = config.all_cities()
@@ -208,12 +205,10 @@ def start_build(city):
 
 def render_quick(city):
     c = config.all_cities()[city]
-    st.title(f"🌫️ Air quality – {city}")
-    st.caption(f"{c['lat']:.3f}°, {c['lon']:.3f}° · no station-trained forecast yet: showing live monitor "
-               "readings (OpenAQ) and the CAMS global model outlook (what most weather apps use).")
     try:
         cams = cams_cached(c["lat"], c["lon"])
     except Exception as e:
+        st.title(city)
         st.error(f"Could not reach the Open-Meteo air-quality service: {e}")
         return
     stations = pd.DataFrame()
@@ -221,7 +216,7 @@ def render_quick(city):
         try:
             stations = stations_cached(c["lat"], c["lon"])
         except Exception as e:
-            st.warning(f"OpenAQ stations unavailable: {e}")
+            st.warning(f"Live station readings are unavailable right now: {e}")
     fresh = stations[stations.time > now - pd.Timedelta(hours=6)] if not stations.empty else stations
 
     past24 = cams[(cams.index <= now) & (cams.index > now - pd.Timedelta(hours=24))]
@@ -231,41 +226,47 @@ def render_quick(city):
     tmr = cams[loc.date == tmr_date]
     aqi_now = I.aqi(past24.pm25.mean(), past24.pm10.mean())
     aqi_tmr = I.aqi(tmr.pm25.mean(), tmr.pm10.mean())
-
-    b1, b2, b3, b4 = st.columns(4)
-    b1.markdown(aqi_badge(aqi_now, "AQI now (CAMS, 24-h)"), unsafe_allow_html=True)
-    b2.markdown(aqi_badge(aqi_tmr, f"AQI tomorrow ({tmr_date:%a %d %b})"), unsafe_allow_html=True)
-    if not fresh.empty:
-        med = float(fresh.pm25.median())
-        b3.metric("Stations now (median PM2.5)", f"{med:.0f} µg/m³",
-                  f"{len(fresh)} monitors · {I.category(med)[0]}", delta_color="off")
-    else:
-        b3.metric("Stations now", "–", "no recent monitor data" if config.OPENAQ_API_KEY else "add OPENAQ_API_KEY",
-                  delta_color="off")
-    if not fut.empty:
-        pk = fut.pm25.idxmax()
-        b4.metric("Peak PM2.5 next 48 h (CAMS)", f"{fut.pm25.max():.0f} µg/m³",
-                  f"{pk.tz_convert(config.LOCAL_TZ):%a %H:%M} · {I.category(fut.pm25.max())[0]}", delta_color="off")
-
     above = fut[fut.pm25 > threshold]
     if not above.empty:
         t0 = above.index[0].tz_convert(config.LOCAL_TZ)
-        st.warning(f"⚠️ The CAMS model shows PM2.5 above your threshold ({threshold} µg/m³) from "
-                   f"**{t0:%a %d %b %H:%M}** for about {len(above)} h. CAMS is not corrected for local "
-                   "conditions - build the forecast below for a calibrated early warning with probabilities.")
+        level, msg = "WATCH", (f"The CAMS model shows PM2.5 above {threshold} µg/m³ from {t0:%a %d %b %H:%M}, "
+                               f"for about {len(above)} hours. Build this city's forecast for a calibrated warning.")
     else:
-        st.success(f"The CAMS model shows PM2.5 staying below your threshold ({threshold} µg/m³) for the next 48 h.")
+        level, msg = "CLEAR", f"The CAMS model keeps PM2.5 below {threshold} µg/m³ for the next 48 hours."
+    name, col = I.aqi_category(aqi_now)
+    hrs = pd.DataFrame({"local_time": fut.index.tz_convert(config.LOCAL_TZ), "value": fut.pm25.to_numpy()})
+    st.markdown(ui.hero(place=city, subline=f"Quick view from the CAMS global model and nearby monitors "
+                        f"({c['lat']:.2f}°, {c['lon']:.2f}°)", aqi_value=aqi_now, aqi_cat=name, aqi_color=col,
+                        aqi_label="AQI, last 24 hours (CAMS)", level=level, message=msg, hours=hrs,
+                        threshold=threshold), unsafe_allow_html=True)
+
+    items = []
+    if not fresh.empty:
+        med = float(fresh.pm25.median())
+        items.append(("Monitors right now", f"{med:.0f} <small>µg/m³</small>",
+                      f"median of {len(fresh)} stations, {I.category(med)[0]}", I.category(med)[1]))
+    else:
+        items.append(("Monitors right now", "–", "no recent readings" if config.OPENAQ_API_KEY
+                      else "add an OpenAQ key to see them", None))
+    n2, c2 = I.aqi_category(aqi_tmr)
+    items.append((f"AQI tomorrow, {tmr_date:%a %d %b}", f"{aqi_tmr:.0f}", n2, c2))
+    if not fut.empty:
+        pk = fut.pm25.idxmax()
+        items.append(("Peak in the next 48 h", f"{fut.pm25.max():.0f} <small>µg/m³</small>",
+                      f"{I.category(fut.pm25.max())[0]}, {pk.tz_convert(config.LOCAL_TZ):%a %H:%M}",
+                      I.category(fut.pm25.max())[1]))
+    st.markdown(ui.tiles(items), unsafe_allow_html=True)
 
     ymax = float(np.nanmax([cams.pm25.max(), threshold, fresh.pm25.max() if not fresh.empty else 0]) * 1.15)
     fig = go.Figure()
     band_chart(fig, ymax)
-    fig.add_trace(go.Scatter(x=loc, y=cams.pm25, name="CAMS PM2.5", line=dict(color="#1e5ac8", width=2.5)))
+    fig.add_trace(go.Scatter(x=loc, y=cams.pm25, name="CAMS PM2.5", line=dict(color="#2F6FDE", width=2.5)))
     fig.add_trace(go.Scatter(x=loc, y=cams.pm10, name="CAMS PM10", line=dict(color="#8d6e63", dash="dot"),
                              visible="legendonly"))
     if not stations.empty:
         fig.add_trace(go.Scatter(x=stations.time.dt.tz_convert(config.LOCAL_TZ), y=stations.pm25, mode="markers",
                                  name="Station readings (latest)", text=stations.station,
-                                 marker=dict(color="#222", size=9, symbol="diamond")))
+                                 marker=dict(color="#1B2A41", size=9, symbol="diamond")))
     fig.add_hline(y=threshold, line=dict(color="#c62828", dash="dash"),
                   annotation_text=f"your threshold {threshold}", annotation_position="bottom right")
     fig.add_vline(x=now.tz_convert(config.LOCAL_TZ), line=dict(color="#555", dash="dot"))
@@ -294,7 +295,7 @@ def render_quick(city):
         m2.dataframe(s2[["station", "pm25", "Category", "updated", "distance_km", "provider"]].round(1),
                      hide_index=True, use_container_width=True)
 
-    st.subheader("🧠 Build the full ML forecast for this city")
+    st.subheader(f"Get the full forecast for {city}")
     st.markdown("Downloads this city's station history and weather, trains the model and turns on the "
                 "calibrated 60-hour forecast, probabilities, drivers and track record. Takes about 3–10 minutes.")
     proc = st.session_state.get("builds", {}).get(city)
@@ -302,10 +303,10 @@ def render_quick(city):
     if not config.OPENAQ_API_KEY:
         st.info("Add your free OpenAQ key to `.env` (OPENAQ_API_KEY=...) first.")
     elif proc is not None and proc.poll() is None:
-        st.info("⏳ Building ... (you can switch cities meanwhile)")
+        st.info("Building the forecast. You can look at other cities meanwhile.")
         if log.exists():
             st.code("\n".join(log.read_text(encoding="utf-8", errors="ignore").splitlines()[-15:]))
-        st.button("🔄 Check progress")
+        st.button("Check progress")
     else:
         if proc is not None:
             if proc.returncode == 0:
@@ -315,7 +316,7 @@ def render_quick(city):
             else:
                 st.error("The build failed - last lines of the log:")
                 st.code("\n".join(log.read_text(encoding="utf-8", errors="ignore").splitlines()[-25:]))
-        if st.button(f"🚀 Build forecast for {city}", type="primary"):
+        if st.button(f"Build forecast for {city}", type="primary"):
             start_build(city)
             st.rerun()
         st.caption(f"Or from a terminal:  python pipeline.py all --city \"{city}\"")
@@ -326,7 +327,7 @@ if view == "Compare cities":
     render_compare()
     st.stop()
 if choice == SEARCH:
-    st.title("🔎 Find a city")
+    st.title("Find a city")
     st.write("Type a city, town or locality in the sidebar, pick the right match and click **Add this place**. "
              "It will then appear in the city list.")
     st.stop()
@@ -343,7 +344,7 @@ with st.sidebar:
     st.divider()
     st.caption(f"**Station:** {meta.get('station')}  \n**Provider:** {meta.get('provider')}  \n"
                f"**Mode:** {meta.get('mode')}")
-    if st.button("🔄 Refresh data & forecast"):
+    if st.button("Refresh data and forecast"):
         args = [sys.executable, "pipeline.py", "update", "--city", choice] + \
                (["--demo"] if meta.get("mode") == "demo" else [])
         with st.spinner("Downloading latest observations & weather forecast ..."):
@@ -356,69 +357,62 @@ with st.sidebar:
 
 # ------------------------------------------------------------------ header
 if meta.get("mode") == "demo":
-    st.info("**DEMO MODE** – synthetic data. Run `python pipeline.py all` with an OpenAQ key for real data.")
+    st.info("Demo mode: these are synthetic data. Run `python pipeline.py all` with an OpenAQ key for real data.")
 
 last_obs_t = hourly["pm25"].last_valid_index()
 last_obs = float(hourly.loc[last_obs_t, "pm25"])
 issue = fc["issue_time"].iloc[0]
 lag_h = (now - last_obs_t).total_seconds() / 3600
 
-st.title(f"🌫️ PM2.5 Early Warning – {meta.get('city')}")
-st.caption(f"Station: {meta.get('station')} · last measurement "
-           f"{last_obs_t.tz_convert(config.LOCAL_TZ):%a %d %b %H:%M} ({lag_h:.0f} h ago) · "
-           f"forecast issued from that measurement, hourly to +{config.MAX_HORIZON} h")
 fresh = meta.get("freshness", {})
 fc_end = fc["target_time"].max()
+alert = I.alert_summary(fc, threshold, now)
+peak_cat = I.category(alert.get("peak_value", np.nan))[0]
+up = I.upcoming(fc, now)
+daily = I.daily_outlook(fc, now)
+pm_all = hourly["pm25"].combine_first(hourly["pm25_bridge"]) if "pm25_bridge" in hourly else hourly["pm25"]
+aqi_now = I.aqi(pm_all[pm_all.index <= now].dropna().tail(24).mean())      # last 24 available hours
+aqi_name, aqi_col = I.aqi_category(aqi_now)
+
+ago = f"{lag_h:.0f} hours ago" if lag_h >= 1.5 else "within the last hour"
+st.markdown(ui.hero(
+    place=meta.get("city"),
+    subline=f"{meta.get('station')}, last measured {ago}",
+    aqi_value=aqi_now, aqi_cat=aqi_name, aqi_color=aqi_col, aqi_label="AQI, last 24 hours",
+    level=alert["level"], message=alert["message"],
+    hours=up.head(48).rename(columns={"q50": "value"})[["local_time", "value"]],
+    threshold=threshold,
+    advice=f"At the peak ({peak_cat}): {I.HEALTH_ADVICE.get(peak_cat, '')}" if peak_cat != "No data" else ""),
+    unsafe_allow_html=True)
+
 if fresh.get("bridged") and lag_h > 6:
-    st.warning(f"⚠️ The station has not reported for {lag_h:.0f} h. The missing hours were estimated from the "
-               f"CAMS model × {fresh['bridge_ratio']:.2f} (its recent local bias) so the forecast starts from now. "
+    st.warning(f"The station has not reported for {lag_h:.0f} h. The missing hours are estimated from the "
+               f"CAMS model × {fresh['bridge_ratio']:.2f} (its recent local bias), so the forecast still starts from now. "
                "Treat it as lower-confidence until the station is back, or switch sensor "
                f"(python pipeline.py all --city \"{choice}\" --sensor <id>).")
 elif lag_h > 12:
-    st.warning(f"The station's latest reading is {lag_h:.0f} h old - forecasts further ahead are less reliable. "
-               "Use 🔄 Refresh, or pick another sensor (AQ_SENSOR_ID in .env; `python pipeline.py update` "
-               "prints the most recently reporting sensors).")
+    st.warning(f"The station's latest reading is {lag_h:.0f} h old, so forecasts further ahead are less reliable. "
+               "Use Refresh in the sidebar, or switch to a sensor that is still reporting.")
 if fc_end <= now:
-    st.error(f"The latest forecast ended at {fc_end.tz_convert(config.LOCAL_TZ):%a %d %b %H:%M} - it is out of date "
-             "because the station stopped reporting. Run `python pipeline.py update` (it will bridge the gap with "
-             "CAMS if the outage is under 14 days) or switch to an active sensor.")
+    st.error(f"This forecast ended at {fc_end.tz_convert(config.LOCAL_TZ):%a %d %b %H:%M} because the station stopped "
+             "reporting. Click Refresh in the sidebar: outages under 14 days are bridged with CAMS.")
 
-# ------------------------------------------------------------------ alert banner
-alert = I.alert_summary(fc, threshold, now)
-bg, fg, icon = LEVEL_STYLE.get(alert["level"], LEVEL_STYLE["Unknown"])
-peak_cat = I.category(alert.get("peak_value", np.nan))[0]
-st.markdown(
-    f"""<div style="background:{bg};border-left:8px solid {fg};padding:14px 18px;border-radius:6px;margin:6px 0 14px">
-    <div style="font-size:1.35rem;font-weight:700;color:{fg}">{icon} {alert['level']} · {profile}</div>
-    <div style="font-size:1.05rem;color:#222;margin-top:4px">{alert['message']}</div>
-    <div style="font-size:0.95rem;color:#444;margin-top:6px"><b>Advice at the peak ({peak_cat}):</b>
-    {I.HEALTH_ADVICE.get(peak_cat, '')}</div></div>""",
-    unsafe_allow_html=True)
-
-up = I.upcoming(fc, now)
-daily = I.daily_outlook(fc, now)
-c1, c2, c3, c4 = st.columns(4)
-pm_all = hourly["pm25"].combine_first(hourly["pm25_bridge"]) if "pm25_bridge" in hourly else hourly["pm25"]
-aqi_now = I.aqi(pm_all[pm_all.index <= now].dropna().tail(24).mean())      # last 24 available hours
-c1.metric("Now (last reading)", f"{last_obs:.0f} µg/m³",
-          f"AQI {aqi_now:.0f} (24-h) · {I.aqi_category(aqi_now)[0]}", delta_color="off")
+items = [("Last reading", f"{last_obs:.0f} <small>µg/m³</small>",
+          f"{I.category(last_obs)[0]}, {last_obs_t.tz_convert(config.LOCAL_TZ):%a %H:%M}", I.category(last_obs)[1])]
 nxt = up[up["target_time"] <= now + pd.Timedelta(hours=24)]
 lat = up[up["target_time"] > now + pd.Timedelta(hours=24)]
-if not nxt.empty:
-    r = nxt.loc[nxt.q50.idxmax()]
-    c2.metric("Peak next 24 h", f"{r.q50:.0f} µg/m³", f"{r.local_time:%a %H:%M} · {I.category(r.q50)[0]}",
-              delta_color="off")
-if not lat.empty:
-    r = lat.loc[lat.q50.idxmax()]
-    c3.metric("Peak 24–48 h", f"{r.q50:.0f} µg/m³", f"{r.local_time:%a %H:%M} · {I.category(r.q50)[0]}",
-              delta_color="off")
+for label, part in (("Peak in the next 24 h", nxt), ("Peak in 24–48 h", lat)):
+    if not part.empty:
+        r = part.loc[part.q50.idxmax()]
+        items.append((label, f"{r.q50:.0f} <small>µg/m³</small>",
+                      f"{I.category(r.q50)[0]}, {r.local_time:%a %H:%M}", I.category(r.q50)[1]))
 if len(daily) > 1:
     d = daily.iloc[1]
-    c4.metric(f"Tomorrow 24-h mean", f"{d.q50:.0f} µg/m³",
-              f"{d.p_naaqs:.0%} chance > NAAQS {config.NAAQS_24H}", delta_color="off")
+    items.append((f"Tomorrow's 24-h mean", f"{d.q50:.0f} <small>µg/m³</small>",
+                  f"{d.p_naaqs:.0%} chance above the national limit of {config.NAAQS_24H}", I.category(d.q50)[1]))
+st.markdown(ui.tiles(items), unsafe_allow_html=True)
 
-tabs = st.tabs(["📈 Forecast", "🗓️ Plan your day", "🔍 Why?", "🎯 Track record", "📊 Insights",
-                "🆚 vs weather apps"])
+tabs = st.tabs(["Forecast", "Plan your day", "Why", "Track record", "Patterns", "Compared with weather apps"])
 
 
 def add_category_bands(fig, ymax):
@@ -440,15 +434,15 @@ with tabs[0]:
     fig = go.Figure()
     add_category_bands(fig, ymax)
     fig.add_trace(go.Scatter(x=fc.local_time, y=fc.q90, line=dict(width=0), showlegend=False, hoverinfo="skip"))
-    fig.add_trace(go.Scatter(x=fc.local_time, y=fc.q10, fill="tonexty", fillcolor="rgba(30,90,200,0.18)",
+    fig.add_trace(go.Scatter(x=fc.local_time, y=fc.q10, fill="tonexty", fillcolor="rgba(47,111,222,0.16)",
                              line=dict(width=0), name="80% range"))
     fig.add_trace(go.Scatter(x=fc.local_time, y=fc.q50, name="Our forecast (median)",
-                             line=dict(color="#1e5ac8", width=3)))
-    fig.add_trace(go.Scatter(x=hist_local, y=hist.values, name="Measured", line=dict(color="#222", width=2)))
+                             line=dict(color="#2F6FDE", width=3)))
+    fig.add_trace(go.Scatter(x=hist_local, y=hist.values, name="Measured", line=dict(color="#1B2A41", width=2)))
     if "pm25_bridge" in hourly and hourly["pm25_bridge"].notna().any():
         b = hourly["pm25_bridge"].dropna()
         fig.add_trace(go.Scatter(x=b.index.tz_convert(config.LOCAL_TZ), y=b.values, name="Estimated (station offline)",
-                                 line=dict(color="#222", width=2, dash="dot")))
+                                 line=dict(color="#1B2A41", width=2, dash="dot")))
     if fc["cams"].notna().any():
         fig.add_trace(go.Scatter(x=fc.local_time, y=fc.cams, name="CAMS global model (what weather apps show)",
                                  line=dict(color="#888", dash="dot")))
@@ -476,12 +470,11 @@ with tabs[1]:
     for col, (_, d) in zip(cols, daily.iterrows()):
         name, color = I.category(d.q50)
         col.markdown(
-            f"""<div style="border-top:6px solid {color};padding:10px;border-radius:6px;background:#fafafa">
-            <div style="font-weight:700">{pd.Timestamp(d.day):%A %d %b}</div>
-            <div style="font-size:1.8rem;font-weight:700">{d.q50:.0f} <span style="font-size:0.9rem">µg/m³ 24-h mean</span></div>
-            <div>{name} · range {d.q10:.0f}–{d.q90:.0f}</div>
-            <div>{d.x_who:.1f}× WHO guideline · ≈ {d.cigarettes:.1f} cigarettes/day equivalent</div>
-            <div>{d.p_naaqs:.0%} chance above India's 24-h standard ({config.NAAQS_24H})</div></div>""",
+            f"""<div class="day" style="--c:{color}"><h4>{pd.Timestamp(d.day):%A %d %b}</h4>
+            <div class="big">{d.q50:.0f} <small>µg/m³ 24-h mean</small></div>
+            <p><b>{name}</b>, likely between {d.q10:.0f} and {d.q90:.0f}</p>
+            <p>{d.x_who:.1f} times the WHO guideline, like smoking {d.cigarettes:.1f} cigarettes</p>
+            <p>{d.p_naaqs:.0%} chance of breaching India's 24-hour limit ({config.NAAQS_24H})</p></div>""",
             unsafe_allow_html=True)
     st.caption("Cigarette equivalence: Berkeley Earth rule of thumb (22 µg/m³ over 24 h ≈ 1 cigarette). "
                "Partial days show only the remaining forecast hours.")
@@ -514,7 +507,7 @@ with tabs[2]:
         dd = drivers.melt(id_vars="driver", var_name="period", value_name="effect")
         dd["period"] = dd["period"].map({"effect_next24h": "Next 24 h", "effect_24_48h": "24–48 h"})
         figd = go.Figure()
-        for per, color in (("Next 24 h", "#90caf9"), ("24–48 h", "#1e5ac8")):
+        for per, color in (("Next 24 h", "#90caf9"), ("24–48 h", "#2F6FDE")):
             s = dd[dd.period == per]
             figd.add_trace(go.Bar(y=s.driver, x=s.effect, name=per, orientation="h", marker_color=color))
         figd.update_layout(height=340, barmode="group", xaxis_title="µg/m³ vs a typical day", margin=dict(t=10))
@@ -568,7 +561,7 @@ with tabs[3]:
 
         bh = pd.DataFrame(backtest["by_horizon"])
         fig = go.Figure()
-        for col, name, style in (("mae_model", "Our model", dict(color="#1e5ac8", width=3)),
+        for col, name, style in (("mae_model", "Our model", dict(color="#2F6FDE", width=3)),
                                  ("mae_persistence", "Persistence (now = later)", dict(color="#999")),
                                  ("mae_same_hour", "Same hour yesterday", dict(color="#bbb", dash="dash")),
                                  ("mae_cams", "CAMS global model", dict(color="#f57c00", dash="dot"))):
@@ -601,10 +594,10 @@ with tabs[3]:
             figb = go.Figure()
             figb.add_trace(go.Scatter(x=s.target_time, y=s.q90, line=dict(width=0), showlegend=False))
             figb.add_trace(go.Scatter(x=s.target_time, y=s.q10, fill="tonexty", line=dict(width=0),
-                                      fillcolor="rgba(30,90,200,0.18)", name="80% range"))
+                                      fillcolor="rgba(47,111,222,0.16)", name="80% range"))
             figb.add_trace(go.Scatter(x=s.target_time, y=s.q50, name=f"Forecast {hsel} h ahead",
-                                      line=dict(color="#1e5ac8")))
-            figb.add_trace(go.Scatter(x=s.target_time, y=s.y, name="Measured", line=dict(color="#222")))
+                                      line=dict(color="#2F6FDE")))
+            figb.add_trace(go.Scatter(x=s.target_time, y=s.y, name="Measured", line=dict(color="#1B2A41")))
             figb.update_layout(height=340, title="Last 30 days of the test period", margin=dict(t=40),
                                legend=dict(orientation="h", y=-0.2))
             c2.plotly_chart(figb, use_container_width=True)

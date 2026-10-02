@@ -24,8 +24,8 @@ _AQI_BP = {
     "pm25": ([0, 30, 60, 90, 120, 250, 500], [0, 50, 100, 200, 300, 400, 500]),
     "pm10": ([0, 50, 100, 250, 350, 430, 600], [0, 50, 100, 200, 300, 400, 500]),
 }
-AQI_CATEGORIES = [("Good", 50, "#2e7d32"), ("Satisfactory", 100, "#9ccc65"), ("Moderate", 200, "#fdd835"),
-                  ("Poor", 300, "#fb8c00"), ("Very Poor", 400, "#e53935"), ("Severe", 10_000, "#7b1fa2")]
+AQI_CATEGORIES = [("Good", 50, "#3FA34D"), ("Satisfactory", 100, "#A3C94F"), ("Moderate", 200, "#F2C230"),
+                  ("Poor", 300, "#F08A24"), ("Very Poor", 400, "#D9412B"), ("Severe", 10_000, "#7E3BA6")]
 
 
 def sub_index(conc, pollutant: str = "pm25"):

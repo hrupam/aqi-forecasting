@@ -53,7 +53,9 @@ CITIES = {name: {"lat": la, "lon": lo, "tz": _IST} for name, (la, lo) in PRESET_
 
 
 def slug(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    import unicodedata
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_") or "place"
 
 
 def _custom_cities() -> dict:
@@ -144,12 +146,12 @@ TEST_FRACTION = 0.25      # last 25 % of time (≥ 1 winter) is held out for the
 # ---------------------------------------------------------------- thresholds (µg/m³)
 # CPCB (India) PM2.5 AQI bands; upper bound of each band.
 CATEGORIES = [
-    ("Good",         30,  "#2e7d32"),
-    ("Satisfactory", 60,  "#9ccc65"),
-    ("Moderate",     90,  "#fdd835"),
-    ("Poor",         120, "#fb8c00"),
-    ("Very Poor",    250, "#e53935"),
-    ("Severe",       10_000, "#7b1fa2"),
+    ("Good",         30,  "#3FA34D"),
+    ("Satisfactory", 60,  "#A3C94F"),
+    ("Moderate",     90,  "#F2C230"),
+    ("Poor",         120, "#F08A24"),
+    ("Very Poor",    250, "#D9412B"),
+    ("Severe",       10_000, "#7E3BA6"),
 ]
 NAAQS_24H = 60      # India National Ambient Air Quality Standard, 24-h mean
 WHO_24H = 15        # WHO 2021 guideline, 24-h mean

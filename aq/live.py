@@ -17,11 +17,20 @@ def geocode(name: str, count: int = 8) -> list[dict]:
         return []
     r = requests.get(GEO_URL, params={"name": name.strip(), "count": count, "language": "en"}, timeout=20)
     r.raise_for_status()
-    out = []
+    out, seen = [], set()
     for g in r.json().get("results", []) or []:
-        parts = [g.get("name"), g.get("admin1"), g.get("country")]
-        out.append({"label": ", ".join(p for p in parts if p), "name": g.get("name"),
-                    "lat": g["latitude"], "lon": g["longitude"],
+        # GeoNames often lists the same town several times (town, municipality, division):
+        # merge entries closer than ~5 km and show the district to tell real namesakes apart
+        key = (g.get("name"), round(g["latitude"] / 0.05), round(g["longitude"] / 0.05))
+        if key in seen:
+            continue
+        seen.add(key)
+        parts = [g.get("name"), g.get("admin2") if g.get("admin2") != g.get("name") else None,
+                 g.get("admin1"), g.get("country")]
+        label = ", ".join(dict.fromkeys(p for p in parts if p))
+        if any(o["label"] == label for o in out):
+            label += f" ({g['latitude']:.2f}°, {g['longitude']:.2f}°)"
+        out.append({"label": label, "name": g.get("name"), "lat": g["latitude"], "lon": g["longitude"],
                     "tz": g.get("timezone") or "UTC", "population": g.get("population")})
     return out
 
