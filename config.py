@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
 MODEL_ROOT = ROOT / "models"
 REPORT_ROOT = ROOT / "reports"
-CITIES_FILE = DATA_ROOT / "cities.json"      # cities added through search / --lat --lon
+# cities added through search / --lat --lon
+CITIES_FILE = DATA_ROOT / "cities.json"
 
 
 def _load_dotenv():
@@ -26,7 +27,8 @@ def _load_dotenv():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+                os.environ.setdefault(
+                    k.strip(), v.strip().strip('"').strip("'"))
 
 
 _load_dotenv()
@@ -49,12 +51,14 @@ PRESET_CITIES = {
     "Durgapur": (23.5204, 87.3119), "Asansol": (23.6739, 86.9524), "Siliguri": (26.7271, 88.3953),
     "Kharagpur": (22.3460, 87.2320), "Howrah": (22.5958, 88.2636),
 }
-CITIES = {name: {"lat": la, "lon": lo, "tz": _IST} for name, (la, lo) in PRESET_CITIES.items()}
+CITIES = {name: {"lat": la, "lon": lo, "tz": _IST}
+          for name, (la, lo) in PRESET_CITIES.items()}
 
 
 def slug(name: str) -> str:
     import unicodedata
-    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    ascii_name = unicodedata.normalize(
+        "NFKD", name).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_") or "place"
 
 
@@ -72,7 +76,8 @@ def all_cities() -> dict:
 def register_city(name: str, lat: float, lon: float, tz: str = _IST, **extra) -> None:
     """Remember a searched / custom city (with its coordinates) for later runs."""
     reg = _custom_cities()
-    reg[name] = {"lat": float(lat), "lon": float(lon), "tz": tz or _IST, **extra}
+    reg[name] = {"lat": float(lat), "lon": float(lon),
+                 "tz": tz or _IST, **extra}
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
     CITIES_FILE.write_text(json.dumps(reg, indent=2), encoding="utf-8")
 
@@ -97,9 +102,12 @@ def _migrate_single_city_layout(default_city: str):
     except Exception:
         city = default_city
     s = slug(city)
-    moves = [(DATA_ROOT / "raw", DATA_ROOT / s / "raw"), (DATA_ROOT / "processed", DATA_ROOT / s / "processed")]
-    moves += [(f, MODEL_ROOT / s / f.name) for f in MODEL_ROOT.glob("*.joblib")]
-    moves += [(f, REPORT_ROOT / s / f.name) for f in REPORT_ROOT.glob("*.*") if f.is_file()]
+    moves = [(DATA_ROOT / "raw", DATA_ROOT / s / "raw"),
+             (DATA_ROOT / "processed", DATA_ROOT / s / "processed")]
+    moves += [(f, MODEL_ROOT / s / f.name)
+              for f in MODEL_ROOT.glob("*.joblib")]
+    moves += [(f, REPORT_ROOT / s / f.name)
+              for f in REPORT_ROOT.glob("*.*") if f.is_file()]
     for src, dst in moves:
         if src.exists() and not dst.exists():
             dst.parent.mkdir(parents=True, exist_ok=True)
@@ -121,7 +129,8 @@ def set_city(name: str, lat: float | None = None, lon: float | None = None, tz: 
     CITY, LAT, LON = name, known["lat"], known["lon"]
     LOCAL_TZ = tz or known.get("tz", _IST)
     env_city = os.environ.get("AQ_CITY", "Kolkata")
-    SENSOR_ID = known.get("sensor_id") or (os.environ.get("AQ_SENSOR_ID") if name == env_city else None)
+    SENSOR_ID = known.get("sensor_id") or (os.environ.get(
+        "AQ_SENSOR_ID") if name == env_city else None)
     s = slug(name)
     RAW_DIR, PROC_DIR = DATA_ROOT / s / "raw", DATA_ROOT / s / "processed"
     MODEL_DIR, REPORT_DIR = MODEL_ROOT / s, REPORT_ROOT / s
@@ -141,7 +150,8 @@ TRAIN_START = os.environ.get("AQ_TRAIN_START", "2023-01-01")
 MAX_HORIZON = 60          # hours; 48 h + slack for station reporting delay
 QUANTILES = (0.1, 0.5, 0.9)
 ISSUE_STRIDE = 3          # use every 3rd hour as a forecast issue time when training
-TEST_FRACTION = 0.25      # last 25 % of time (≥ 1 winter) is held out for the backtest
+# last 25 % of time (≥ 1 winter) is held out for the backtest
+TEST_FRACTION = 0.25
 
 # ---------------------------------------------------------------- thresholds (µg/m³)
 # CPCB (India) PM2.5 AQI bands; upper bound of each band.

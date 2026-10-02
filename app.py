@@ -183,14 +183,14 @@ def render_compare():
                      landcolor="#f5f5f0", showocean=True, oceancolor="#e8f1f8")
     figm.update_layout(height=520, margin=dict(l=0, r=0, t=10, b=0))
     c1, c2 = st.columns([1.1, 1])
-    c1.plotly_chart(figm, use_container_width=True)
+    c1.plotly_chart(figm, width="stretch")
     top = t.head(20)[::-1]
     figb = go.Figure(go.Bar(x=top["AQI now"], y=top.City, orientation="h", marker_color=top.color,
                             hovertemplate="%{y}: AQI %{x:.0f}<extra></extra>"))
     figb.update_layout(height=520, title="AQI now (24-h mean)", margin=dict(t=40, l=10))
-    c2.plotly_chart(figb, use_container_width=True)
+    c2.plotly_chart(figb, width="stretch")
     show = t[["City", "AQI now", "Category", "PM2.5 now", "Peak PM2.5 next 48 h", "AQI tomorrow", "Tomorrow", "Source"]]
-    st.dataframe(show.round(0), hide_index=True, use_container_width=True)
+    st.dataframe(show.round(0), hide_index=True, width="stretch")
 
 
 # ------------------------------------------------------------------ view: quick city (no model yet)
@@ -272,7 +272,7 @@ def render_quick(city):
     fig.add_vline(x=now.tz_convert(config.LOCAL_TZ), line=dict(color="#555", dash="dot"))
     fig.update_layout(height=430, yaxis_title="µg/m³", yaxis_range=[0, ymax], hovermode="x unified",
                       margin=dict(t=30, b=10), legend=dict(orientation="h", y=1.08))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     d = cams.assign(day=loc.date).groupby("day").agg(pm25=("pm25", "mean"), pm10=("pm10", "mean"),
                                                       peak=("pm25", "max"), n=("pm25", "size"))
@@ -283,7 +283,7 @@ def render_quick(city):
     st.subheader("Daily outlook (CAMS)")
     st.dataframe(d.reset_index().rename(columns={"day": "Day", "pm25": "PM2.5 mean", "pm10": "PM10 mean",
                                                  "peak": "PM2.5 peak"}).drop(columns="n").round(0),
-                 hide_index=True, use_container_width=True)
+                 hide_index=True, width="stretch")
 
     if not stations.empty:
         st.subheader("Nearest monitoring stations")
@@ -293,7 +293,7 @@ def render_quick(city):
         m1, m2 = st.columns([1, 1.2])
         m1.map(s2, latitude="lat", longitude="lon", color="color", size=400)
         m2.dataframe(s2[["station", "pm25", "Category", "updated", "distance_km", "provider"]].round(1),
-                     hide_index=True, use_container_width=True)
+                     hide_index=True, width="stretch")
 
     st.subheader(f"Get the full forecast for {city}")
     st.markdown("Downloads this city's station history and weather, trains the model and turns on the "
@@ -451,7 +451,7 @@ with tabs[0]:
     fig.add_vline(x=now.tz_convert(config.LOCAL_TZ), line=dict(color="#555", dash="dot"))
     fig.update_layout(height=470, yaxis_title="PM2.5 (µg/m³)", yaxis_range=[0, ymax], hovermode="x unified",
                       margin=dict(t=30, b=10), legend=dict(orientation="h", y=1.08))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     up["p"] = exceed_prob(up.q10, up.q50, up.q90, threshold)
     figp = go.Figure(go.Bar(x=up.local_time, y=up.p * 100,
@@ -459,7 +459,7 @@ with tabs[0]:
                             hovertemplate="%{x|%a %H:%M}: %{y:.0f}%<extra></extra>"))
     figp.update_layout(height=230, title=f"Chance PM2.5 exceeds {threshold} µg/m³, hour by hour",
                        yaxis_title="%", yaxis_range=[0, 100], margin=dict(t=40, b=10))
-    st.plotly_chart(figp, use_container_width=True)
+    st.plotly_chart(figp, width="stretch")
 
 # ------------------------------------------------------------------ tab 2: plan
 with tabs[1]:
@@ -495,7 +495,7 @@ with tabs[1]:
                     Category=up.q50.apply(lambda v: I.category(v)[0]),
                     **{"Chance > threshold": (up.p * 100).round(0).astype(int).astype(str) + "%"})
     st.dataframe(tbl[["Time", "Forecast", "Low", "High", "Category", "Chance > threshold"]],
-                 hide_index=True, use_container_width=True, height=360)
+                 hide_index=True, width="stretch", height=360)
     st.download_button("⬇️ Download forecast (CSV)", fc.to_csv(index=False), "pm25_forecast.csv")
 
 # ------------------------------------------------------------------ tab 3: why
@@ -511,7 +511,7 @@ with tabs[2]:
             s = dd[dd.period == per]
             figd.add_trace(go.Bar(y=s.driver, x=s.effect, name=per, orientation="h", marker_color=color))
         figd.update_layout(height=340, barmode="group", xaxis_title="µg/m³ vs a typical day", margin=dict(t=10))
-        st.plotly_chart(figd, use_container_width=True)
+        st.plotly_chart(figd, width="stretch")
         for s in I.driver_sentences(drivers) or ["No single weather factor stands out - conditions are near typical."]:
             st.markdown(f"- {s}")
 
@@ -528,14 +528,14 @@ with tabs[2]:
     figw.update_layout(height=320, yaxis=dict(title="m²/s"), margin=dict(t=10),
                        yaxis2=dict(title="mm/h", overlaying="y", side="right", showgrid=False),
                        legend=dict(orientation="h", y=1.12))
-    st.plotly_chart(figw, use_container_width=True)
+    st.plotly_chart(figw, width="stretch")
 
     if backtest and backtest.get("importance"):
         imp = pd.Series(backtest["importance"]).head(12)[::-1]
         figi = go.Figure(go.Bar(x=imp.values, y=imp.index, orientation="h", marker_color="#546e7a"))
         figi.update_layout(height=380, title="Most important model inputs overall (permutation importance)",
                            margin=dict(t=40))
-        st.plotly_chart(figi, use_container_width=True)
+        st.plotly_chart(figi, width="stretch")
         st.caption("The model predicts how PM2.5 will CHANGE from the latest reading. "
                    "Prefixes: p_ = recent measured PM2.5 (relative to now), w_ = weather at the target hour, "
                    "c_cams_change = how much CAMS expects regional PM2.5 to change, "
@@ -569,13 +569,13 @@ with tabs[3]:
                 fig.add_trace(go.Scatter(x=bh.h, y=bh[col], name=name, line=style))
         fig.update_layout(height=360, xaxis_title="Lead time (h)", yaxis_title="Mean absolute error (µg/m³)",
                           margin=dict(t=10), legend=dict(orientation="h", y=1.1))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         st.subheader("How good are the warnings? (24–48 h ahead, warn when chance ≥ 50%)")
         al = pd.DataFrame(backtest["alerts"]).T.reset_index().rename(columns={"index": "Threshold µg/m³"})
         al = al.rename(columns={"events": "Event hours", "POD": "Caught (POD)", "FAR": "False alarms (FAR)",
                                 "CSI": "CSI", "brier": "Brier score"})
-        st.dataframe(al, hide_index=True, use_container_width=True)
+        st.dataframe(al, hide_index=True, width="stretch")
 
         c1, c2 = st.columns(2)
         rel = pd.DataFrame(backtest.get("reliability", []))
@@ -587,7 +587,7 @@ with tabs[3]:
             figr.update_layout(height=340, title="Reliability: when we say X%, does it happen X% of the time? (>90)",
                                xaxis_title="Forecast probability", yaxis_title="Observed frequency",
                                margin=dict(t=40))
-            c1.plotly_chart(figr, use_container_width=True)
+            c1.plotly_chart(figr, width="stretch")
         if btp is not None:
             hsel = c2.selectbox("Lead time to inspect", sorted(btp.h.unique()), index=min(4, btp.h.nunique() - 1))
             s = btp[btp.h == hsel].sort_values("target_time").tail(24 * 30)
@@ -600,7 +600,7 @@ with tabs[3]:
             figb.add_trace(go.Scatter(x=s.target_time, y=s.y, name="Measured", line=dict(color="#1B2A41")))
             figb.update_layout(height=340, title="Last 30 days of the test period", margin=dict(t=40),
                                legend=dict(orientation="h", y=-0.2))
-            c2.plotly_chart(figb, use_container_width=True)
+            c2.plotly_chart(figb, width="stretch")
 
 # ------------------------------------------------------------------ tab 5: insights
 with tabs[4]:
@@ -613,7 +613,7 @@ with tabs[4]:
                                 y=hm.index, colorscale="YlOrRd", colorbar=dict(title="µg/m³")))
     figh.update_layout(height=420, title="Typical PM2.5 by hour of day and month", yaxis_title="Hour (IST)",
                        margin=dict(t=40))
-    c1.plotly_chart(figh, use_container_width=True)
+    c1.plotly_chart(figh, width="stretch")
 
     if "wind_dir" in h:
         h["sector"] = ((h.wind_dir + 22.5) // 45 % 8).astype(int)
@@ -623,20 +623,20 @@ with tabs[4]:
                                      marker_colorscale="YlOrRd"))
         figr.update_layout(height=420, title="Pollution rose: mean PM2.5 by wind direction (where dirty air comes from)",
                            margin=dict(t=60))
-        c2.plotly_chart(figr, use_container_width=True)
+        c2.plotly_chart(figr, width="stretch")
 
     daily_obs = h.pm25.resample("D").mean()
     ex = (daily_obs > config.NAAQS_24H).groupby(daily_obs.index.to_period("M")).sum()
     fige = go.Figure(go.Bar(x=ex.index.astype(str), y=ex.values, marker_color="#e53935"))
     fige.update_layout(height=300, title=f"Days per month with 24-h mean above NAAQS ({config.NAAQS_24H} µg/m³)",
                        margin=dict(t=40))
-    st.plotly_chart(fige, use_container_width=True)
+    st.plotly_chart(fige, width="stretch")
 
     wk = h.groupby("dow").pm25.mean()
     c1, c2 = st.columns(2)
     c1.plotly_chart(go.Figure(go.Bar(x=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], y=wk.values,
                                      marker_color="#546e7a")).update_layout(
-        height=280, title="Weekday effect (traffic & activity)", margin=dict(t=40)), use_container_width=True)
+        height=280, title="Weekday effect (traffic & activity)", margin=dict(t=40)), width="stretch")
     c2.markdown("**Data quality report**")
     c2.json(meta.get("qc", {}))
 
