@@ -1,0 +1,22 @@
+{
+  "B\u0101r\u0101sat": {
+    "lat": 22.91947,
+    "lon": 88.83831,
+    "tz": "Asia/Kolkata"
+  },
+  "Amritsar": {
+    "lat": 31.634,
+    "lon": 74.8723,
+    "tz": "Asia/Kolkata"
+  },
+  "Kolkata": {
+    "lat": 22.5726,
+    "lon": 88.3639,
+    "tz": "Asia/Kolkata"
+  },
+  "Ahmedabad": {
+    "lat": 23.0225,
+    "lon": 72.5714,
+    "tz": "Asia/Kolkata"
+  }
+}

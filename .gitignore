@@ -1,6 +1,6 @@
 .env
-data/
-models/
-reports/
 __pycache__/
 .venv/
+*.log
+trace_*.txt
+# data/, models/ and reports/ are committed on purpose: the deployed app reads them

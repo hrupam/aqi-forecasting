@@ -14,20 +14,21 @@ The system downloads real monitoring-station readings from **OpenAQ** and combin
 ## Contents
 
 1. [What it does](#1-what-it-does)
-2. [What it adds beyond Google Weather and similar apps](#2-what-it-adds-beyond-google-weather-and-similar-apps)
+2. [What it adds beyond Google Weather and IQAir](#2-what-it-adds-beyond-google-weather-and-iqair)
 3. [Requirements](#3-requirements)
 4. [Getting started (step by step)](#4-getting-started-step-by-step)
 5. [Everyday use](#5-everyday-use)
 6. [Using the dashboard](#6-using-the-dashboard)
 7. [Working with multiple cities](#7-working-with-multiple-cities)
 8. [Automatic alerts (Telegram / e-mail)](#8-automatic-alerts-telegram--e-mail)
-9. [How it works](#9-how-it-works)
-10. [Results](#10-results)
-11. [Project structure](#11-project-structure)
-12. [Configuration reference](#12-configuration-reference)
-13. [Troubleshooting](#13-troubleshooting)
-14. [Limitations and ideas for extension](#14-limitations-and-ideas-for-extension)
-15. [Data sources and licences](#15-data-sources-and-licences)
+9. [Deploying online (free)](#9-deploying-online-free)
+10. [How it works](#10-how-it-works)
+11. [Results](#11-results)
+12. [Project structure](#12-project-structure)
+13. [Configuration reference](#13-configuration-reference)
+14. [Troubleshooting](#14-troubleshooting)
+15. [Limitations and ideas for extension](#15-limitations-and-ideas-for-extension)
+16. [Data sources and licences](#16-data-sources-and-licences)
 
 ---
 
@@ -41,20 +42,24 @@ The system downloads real monitoring-station readings from **OpenAQ** and combin
 
 ---
 
-## 2. What it adds beyond Google Weather and similar apps
+## 2. What it adds beyond Google Weather and IQAir
 
-| Typical weather app | This project |
-|---|---|
-| Shows a number from a coarse global model (CAMS, roughly 10–45 km grid) | Forecast anchored to your **nearest real monitoring station** and corrected for local bias |
-| One value, no uncertainty | **80% range** plus the **probability (%)** of exceeding your threshold |
-| No advance warning | **Watch / Warning / Emergency up to 48 h ahead**, with start time, duration and peak |
-| One scale for everyone | **Personal thresholds**: asthma and heart/lung conditions, children and elderly, athletes, WHO-strict, or your own value |
-| US-style AQI | **India CPCB AQI and categories**, the national 24-hour limit (60 µg/m³) and the WHO guideline (15 µg/m³) |
-| No explanation | **Why it will be bad**: low wind, low mixing height, no rain, or polluted air arriving from the region |
-| No planning help | **Cleanest outdoor time window** each day, cigarette-equivalent dose |
-| Accuracy is never shown | A public **track record**: error by lead time, warnings caught and false alarms, reliability of the probabilities |
-| No local analysis | Hour × month heatmap, **pollution rose** (which wind direction brings dirty air), weekday effect, days above the limit |
-| Fixed notifications | **Your own alerts** to Telegram or e-mail on your own schedule |
+Google Weather and IQAir already show an hourly air-quality forecast for almost any place. What they show is **one number per hour**. This project adds the layer you need to act on it:
+
+| | Google Weather | IQAir | This project |
+|---|---|---|---|
+| Source and scale | Models + sensors on a ~500 m grid | Government monitors (in Indian cities, the same CPCB / state-board network), low-cost sensors, satellite; **US AQI** scale | The **nearest official monitor**, with ML correcting the model's local bias; **India's CPCB AQI**, the 24-h limit (60 µg/m³) and the WHO guideline (15 µg/m³) |
+| Forecast | Hourly, up to 4 days | Hourly and daily, up to 7 days | Hourly PM2.5, 1–60 h, anchored to the latest reading |
+| Uncertainty | One number per hour | One number per hour | **80 % range** for every hour, calibrated on past data |
+| Probability | – | – | **Chance (%) of crossing your threshold**, every hour and per day |
+| Early warning | Colour category | Alert when the air is bad | **Watch / Warning / Emergency ahead of time**, with start time, duration and peak |
+| Personal thresholds | – | – | Asthma / heart / lung, children & elderly, outdoor work, WHO-strict, or your own value |
+| Why will it be bad? | – | – | **Driver attribution**: wind, mixing height, rain, humidity, regional pollution, in µg/m³ |
+| Track record | Not published | Accuracy claimed, no figures | **Published backtest** for every city: error by lead time, warnings caught and false alarms, reliability |
+| Local analysis | – | City rankings, history | Hour × month heatmap, **pollution rose**, weekday effect, days above the limit |
+| Open | Closed | Closed | Open data, open code, retrainable for any city |
+
+Where they are stronger: every place on Earth, more stations and pollutants, a longer range and polished mobile apps.
 
 ---
 
@@ -288,9 +293,62 @@ ALERT_EMAIL_TO=you@gmail.com
 
 On macOS/Linux, use cron: `0 */3 * * * cd /path/to/aqews && .venv/bin/python alert.py --city Kolkata`.
 
+**Or let GitHub run it.** Once the project is on GitHub, the scheduled job in section 9 checks for alerts every 3 hours without your computer being on.
+
 ---
 
-## 9. How it works
+## 9. Deploying online (free)
+
+The dashboard runs on **Streamlit Community Cloud**, and a **GitHub Actions** job keeps every city up to date. Both are free.
+
+```
+GitHub repo (code + data + models) ──► Streamlit Community Cloud ──► users
+        ▲                                 (redeploys on every commit)
+        └── GitHub Actions, every 3 h: update all cities, re-forecast, alert check, commit
+```
+
+### 9.1 Put the project on GitHub
+`data/`, `models/` and `reports/` are committed on purpose (about 70 MB): the deployed app reads them, and nothing is trained on the server.
+```bat
+git add .
+git commit -m "Final version"
+git push
+```
+`requirements.txt` pins the exact package versions the models were trained with. If you retrain with newer packages, update the pins to match (`pip freeze`).
+
+### 9.2 Deploy the dashboard
+1. Go to <https://share.streamlit.io>, sign in with GitHub and choose **Create app**.
+2. Pick the repository, branch `main`, main file `app.py`.
+3. **Advanced settings**:
+   * Python version: **3.12**
+   * Secrets:
+     ```toml
+     OPENAQ_API_KEY = "your-key"
+     ```
+4. **Deploy**. `app.py` copies the secret into the environment, so the Refresh button and new-city builds work on the server too.
+
+Things to know about the free tier:
+* the app sleeps after 12 hours without visitors; opening the link wakes it
+* files written on the server (a Refresh, a city built from the dashboard) are lost when the app restarts; the scheduled job below is what keeps the published data fresh
+* building a new city on the server takes several minutes; for a city you want to keep, build it locally and push
+
+### 9.3 Keep it fresh: the scheduled job
+`.github/workflows/update.yml` runs every 3 hours. It:
+1. runs `python pipeline.py update --all-cities`
+2. runs `python alert.py --city Kolkata --no-refresh` (sends a Telegram message if the warning level rose)
+3. commits the new files, which makes Streamlit redeploy
+
+Add the secrets in GitHub under **Settings → Secrets and variables → Actions**:
+* `OPENAQ_API_KEY` (required)
+* `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (optional, for alerts; see section 8)
+
+Start it once by hand from the **Actions** tab → **Update forecasts** → **Run workflow**.
+
+Retrain from your own computer now and then (`python pipeline.py train --all-cities`) and push the result.
+
+---
+
+## 10. How it works
 
 ```
  OpenAQ station PM2.5 ──┐
@@ -301,7 +359,7 @@ On macOS/Linux, use cron: `0 */3 * * * cd /path/to/aqews && .venv/bin/python ale
                                        Streamlit dashboard (app.py) reads everything in reports/<city>/
 ```
 
-### 9.1 Data collection (`aq/openaq.py`, `aq/openmeteo.py`)
+### 10.1 Data collection (`aq/openaq.py`, `aq/openmeteo.py`)
 * **OpenAQ v3**:
   * `/locations?coordinates=…&radius=…&parameters_id=2` finds the stations.
   * `/sensors/{id}/hours` gives hourly averages, downloaded in 120-day chunks with pagination and back-off on rate limits.
@@ -309,7 +367,7 @@ On macOS/Linux, use cron: `0 */3 * * * cd /path/to/aqews && .venv/bin/python ale
 * **Open-Meteo Air-Quality API**: CAMS PM2.5 history (from August 2022) and its 4-day forecast.
 * Downloads are **incremental**: later runs only fetch what is new.
 
-### 9.2 Quality control (`aq/dataset.py`)
+### 10.2 Quality control (`aq/dataset.py`)
 * **Removed readings**:
   * values ≤ 0 or above 1000 µg/m³
   * hours with less than 50% coverage
@@ -318,7 +376,7 @@ On macOS/Linux, use cron: `0 */3 * * * cd /path/to/aqews && .venv/bin/python ale
 * **Gap filling**: gaps of up to 3 hours are interpolated; longer gaps stay empty.
 * **Station outages**: if a station has stopped reporting for 6 hours to 14 days, the missing recent hours are **estimated from CAMS**, scaled by the station/CAMS ratio of the previous week. This lets forecasts still start from now. These estimates are never used for training, and the dashboard flags them.
 
-### 9.3 Features (`aq/features.py`)
+### 10.3 Features (`aq/features.py`)
 Each training example is a pair *(issue time T, lead time h)*. One model therefore covers the whole 1–60 h range without feeding its own errors back in.
 
 * **Known at T**:
@@ -335,7 +393,7 @@ Each training example is a pair *(issue time T, lead time h)*. One model therefo
 * **CAMS**: how much the regional model expects PM2.5 to change.
 * **Calendar**: hour of day and weekday in local time.
 
-### 9.4 Model (`aq/model.py`)
+### 10.4 Model (`aq/model.py`)
 * **Algorithm**: scikit-learn `HistGradientBoostingRegressor` with **quantile loss**, three models for the 10th, 50th and 90th percentiles.
 * **Target: the change from now**, log(1 + PM2.5 at T+h) − log(1 + PM2.5 at T), not the absolute level. Past-PM features are expressed relative to the current level too.
   * This keeps the forecast anchored to what the station measures today.
@@ -344,7 +402,7 @@ Each training example is a pair *(issue time T, lead time h)*. One model therefo
 * **Calibrated uncertainty**: split-conformal scaling widens or narrows the 10–90% band for each lead time, so it really contains the measured value about 80% of the time.
 * **Exceedance probability**: P(PM2.5 > threshold) comes from the calibrated quantiles, using a split-normal distribution in log space.
 
-### 9.5 Evaluation
+### 10.5 Evaluation
 * The **last 25% of the timeline** is held out. No training target falls inside it.
 * Alternate weeks of that period tune the blending and the band width. The other weeks are used for every reported score.
 * **Baselines**:
@@ -356,11 +414,11 @@ Each training example is a pair *(issue time T, lead time h)*. One model therefo
   * for warnings 24–48 h ahead at 60, 90 and 120 µg/m³: probability of detection (POD), false-alarm ratio (FAR), critical success index (CSI) and Brier score
   * a reliability diagram
 
-### 9.6 Explanations
+### 10.6 Explanations
 * **Global**: permutation importance of the inputs.
 * **For each forecast**: each weather group's inputs are replaced with their typical value for that month and hour, and the model is re-run. The change in the forecast (µg/m³) shows how much that factor is pushing pollution up or down today.
 
-### 9.7 AQI and categories (`aq/insights.py`)
+### 10.7 AQI and categories (`aq/insights.py`)
 * **India CPCB AQI** from 24-hour mean PM2.5 and PM10. The AQI is the higher of the two sub-indices.
 
 | Category | AQI | PM2.5 (µg/m³) |
@@ -380,33 +438,41 @@ Each training example is a pair *(issue time T, lead time h)*. One model therefo
 
 ---
 
-## 10. Results
+## 11. Results
 
-These are out-of-sample results for **Kolkata** (Padmapukur, Howrah station), with forecasts issued April–September 2026. The table shows mean absolute error in µg/m³; lower is better.
+Out-of-sample results for every city with a model, after retraining on 9 November 2026. Each city is tested on the last 25 % of its own timeline (forecasts the model never saw while training), which now includes this autumn's polluted weeks. MAE is the mean absolute error in µg/m³; lower is better. "vs" columns show how much smaller our error is than the baseline.
 
-| Lead time | 1 h | 6 h | 12 h | 24 h | 48 h | 60 h |
+| City (station) | Test period | MAE 0–24 h | MAE 24–48 h | vs persistence (day 1 / 2) | vs CAMS (day 1 / 2) | 80 % range holds |
 |---|---|---|---|---|---|---|
-| **This model** | **1.6** | **3.4** | **3.9** | **4.2** | **4.4** | **4.6** |
-| Persistence (latest reading) | 1.6 | 4.1 | 5.0 | 4.9 | 6.0 | 6.7 |
-| CAMS (weather apps) | 12.1 | 12.3 | 12.7 | 12.8 | 13.3 | 14.1 |
+| **Ahmedabad** (IIMA Ventures) | 2026-08-19 → 2026-11-09 | 9.3 | 11.1 | 19% / 20% | 36% / 26% | 78% / 83% |
+| **Amritsar** (Golden Temple, Amritsar - PPCB) | 2026-06-09 → 2026-11-09 | 5.5 | 6.9 | 3% / 8% | 80% / 77% | 85% / 88% |
+| **Delhi** (Anand Vihar, New Delhi - DPCC) | 2026-06-02 → 2026-11-09 | 23.5 | 25.9 | 24% / 27% | 31% / 26% | 81% / 80% |
+| **Gurugram** (R K Puram, Delhi - DPCC) | 2026-06-03 → 2026-11-09 | 21.0 | 23.3 | 26% / 25% | 60% / 55% | 76% / 78% |
+| **Jaipur** (Police Commissionerate, Jaipur - RSPCB) | 2026-06-06 → 2026-11-09 | 8.7 | 10.9 | 14% / 15% | 52% / 38% | 82% / 82% |
+| **Kanpur** (Nehru Nagar, Kanpur - UPPCB) | 2026-06-04 → 2026-11-09 | 12.0 | 13.6 | 26% / 25% | 46% / 35% | 80% / 81% |
+| **Kolkata** (Padmapukur, Howrah - WBPCB) | 2026-05-26 → 2026-11-09 | 5.4 | 7.0 | 15% / 16% | 62% / 53% | 83% / 83% |
+| **Siliguri** (Ward-32 Bapupara, Siliguri - WBPCB) | 2026-05-30 → 2026-11-09 | 3.2 | 4.0 | 35% / 34% | 76% / 69% | 85% / 86% |
 
-* The model is about **18% better than persistence over 0–24 h and 24% better over 24–48 h**. It is roughly **3 times more accurate than CAMS**.
-* The 80% band contains the measured value about 80% of the time.
-* Warning scores (POD/FAR) aren't meaningful yet: that test period was summer and monsoon, with very few hours above 60 µg/m³. Retrain after the winter season for a proper evaluation of the warnings.
+* **Persistence** ("same as the latest reading") is the standard baseline for short-range forecasts. The model beats it in every city; the gain is smallest where pollution changed little during the test months (Amritsar).
+* **CAMS** is the global model behind many weather apps. The model is 31–80 % more accurate on day 1, because it is anchored to the local station.
+* The **80 % range** contains the measured value 77–88 % of the time, so the uncertainty and the probabilities can be trusted.
+* **Warnings** at 60 µg/m³, 24–48 h ahead: where polluted hours were common (Delhi, Gurugram, Amritsar, Jaipur, Kanpur, Kolkata) the system warned about 34–70 % of them, with 25–38 % false alarms. Ahmedabad and Siliguri had few, short polluted spells and score poorly; they need more winter data.
 
-Your own numbers appear in the **Track record** tab after every `train`.
+Refresh this table after retraining: `python tools/summarize_results.py --markdown`. Each city's details are in the dashboard's **Track record** tab.
 
 > Scores from `--demo` runs come from synthetic data and must not be reported as results.
 
 ---
 
-## 11. Project structure
+## 12. Project structure
 
 ```
 aqews/
 ├── app.py                  Streamlit dashboard (city picker, quick view, compare, full dashboard)
 ├── pipeline.py             Command line: fetch | train | forecast | update | all  (--city, --demo, ...)
 ├── alert.py                Scheduled Telegram / e-mail notifier
+├── tools/summarize_results.py  Collects every city's backtest into reports/summary_all_cities.json
+├── .github/workflows/update.yml  Scheduled job: update all cities + alert check every 3 h
 ├── config.py               Cities, folders, thresholds, model settings
 ├── requirements.txt        Python packages
 ├── .env.example            Template for your API key and alert settings (copy to .env)
@@ -428,11 +494,11 @@ aqews/
 └── reports/<city>/         forecast.csv, drivers.csv, backtest.json, backtest_predictions.csv
 ```
 
-`data/`, `models/`, `reports/`, `.venv/` and `.env` are excluded from Git.
+`.venv/` and `.env` are excluded from Git. `data/`, `models/` and `reports/` are committed so the deployed app can read them.
 
 ---
 
-## 12. Configuration reference
+## 13. Configuration reference
 
 ### `.env` (create it from `.env.example`)
 | Variable | Purpose |
@@ -459,7 +525,7 @@ aqews/
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 | Problem | Fix |
 |---|---|
@@ -476,7 +542,7 @@ aqews/
 
 ---
 
-## 14. Limitations and ideas for extension
+## 15. Limitations and ideas for extension
 
 **Limitations**
 * Weather inputs at forecast time are themselves forecasts, so errors grow beyond about 48 h.
@@ -491,11 +557,10 @@ aqews/
 * Compare with LightGBM/XGBoost, LSTM or Temporal Fusion Transformer models.
 * Add SHAP explanations for each individual forecast.
 * Forecast more pollutants (PM10, NO₂, O₃) to give a complete CPCB AQI.
-* Deploy the dashboard (Streamlit Community Cloud) with a scheduled `update --all-cities`.
 
 ---
 
-## 15. Data sources and licences
+## 16. Data sources and licences
 
 * **OpenAQ**: <https://openaq.org>, CC BY 4.0 (individual providers' licences apply; Indian data comes from CPCB and state pollution control boards)
 * **Open-Meteo** weather, air-quality and geocoding APIs: <https://open-meteo.com>, CC BY 4.0

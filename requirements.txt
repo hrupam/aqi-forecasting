@@ -1,8 +1,10 @@
-# Tested with Python 3.12 on Windows (streamlit 1.64, pandas 3.0, numpy 2.5, scikit-learn 1.9, plotly 7.1)
-pandas>=2.2
-numpy>=1.26
-scikit-learn>=1.4
-joblib>=1.3
-requests>=2.31
-plotly>=5.24
-streamlit>=1.64
+# Pinned to the versions the models were trained with (Python 3.12).
+# The saved model must be loaded with the same scikit-learn / pandas versions.
+pandas==3.0.6
+numpy==2.5.3
+scikit-learn==1.9.1
+joblib==1.6.0
+pyarrow==25.0.1
+requests==2.34.2
+plotly==7.1.0
+streamlit==1.64.0

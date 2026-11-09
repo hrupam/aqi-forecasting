@@ -13,6 +13,15 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+# On Streamlit Community Cloud the OpenAQ key lives in the app's Secrets, not in .env.
+# Copy it into the environment before config reads it, so this app and every pipeline
+# run it starts (Refresh, building a new city) can use it.
+try:
+    if "OPENAQ_API_KEY" in st.secrets:
+        os.environ.setdefault("OPENAQ_API_KEY", str(st.secrets["OPENAQ_API_KEY"]).strip())
+except Exception:                       # no secrets file (normal when running locally)
+    pass
+
 import config
 from aq import insights as I, live, ui
 from aq.model import exceed_prob
@@ -738,21 +747,24 @@ with tabs[4]:
 
 # ------------------------------------------------------------------ tab 6: comparison
 with tabs[5]:
-    st.subheader("What this system adds beyond Google Weather / typical weather apps")
+    st.subheader("What this system adds beyond Google Weather and IQAir")
     st.markdown("""
-| Need | Typical weather app (Google Weather etc.) | This system |
-|---|---|---|
-| Source of the number | Global/regional chemistry model (e.g. CAMS, ~10–45 km grid), often not your street | **Your nearest real monitoring station**, corrected by ML for local bias |
-| Forecast detail | Current AQI and a single daily or hourly guess | **Hourly 1–60 h forecast with an 80% uncertainty band** |
-| Early warning | None – you see it when it is already bad | **Alert levels (Watch / Warning / Emergency) with lead time, start, duration and peak** |
-| Probability | Not given | **Chance (%) of crossing your threshold, every hour and per day** |
-| Personal thresholds | One AQI scale for everyone | **Profiles for asthma, children/elderly, athletes; custom threshold** |
-| Indian standards | US-EPA style AQI in many apps | **CPCB categories, 24-h NAAQS (60) and WHO (15) comparison** |
-| Why will it be bad? | No explanation | **Driver attribution: wind, mixing height, rain, humidity, regional transport** |
-| When to go out | Not offered | **Cleanest outdoor time window each day** |
-| Health meaning | Generic text | **Cigarette-equivalent dose, ×WHO, category-specific advice** |
-| Trustworthiness | Accuracy never shown | **Public track record: error vs lead time, alert hit/false-alarm rates, reliability** |
-| Local patterns | — | **Diurnal/seasonal heatmap, pollution rose (source direction), weekday effect, exceedance days** |
-| Alerts outside the app | Generic notifications | **Scriptable alerts (Telegram / e-mail) on your schedule** (`alert.py`) |
-| Open & reproducible | Closed | **Open data (OpenAQ, Open-Meteo), open code, retrainable for any city** |
+| Need | Google Weather | IQAir | This system |
+|---|---|---|---|
+| Source of the number | Models + sensors on a ~500 m grid | Government monitors (WBPCB/CPCB in Indian cities), low-cost sensors, satellite | **The nearest official monitoring station, with ML correcting the model's local bias** |
+| Forecast | Hourly AQI, up to 4 days | Hourly and daily, up to 7 days | **Hourly PM2.5, 1–60 h, anchored to the latest reading** |
+| Uncertainty | One number per hour | One number per hour | **80 % range for every hour, calibrated on past data** |
+| Probability | Not given | Not given | **Chance (%) of crossing your threshold, every hour and per day** |
+| Early warning | Colour category | Alert when the air is bad | **Watch / Warning / Emergency with start time, duration and peak, ahead of time** |
+| Personal thresholds | One scale for everyone | One scale for everyone | **Profiles for asthma, children/elderly, outdoor work; custom threshold** |
+| Indian standards | Varies by region | US AQI scale | **CPCB categories, the 24-h NAAQS (60) and WHO (15) comparison** |
+| Why will it be bad? | Not explained | Not explained | **Driver attribution: wind, mixing height, rain, humidity, regional transport** |
+| When to go out | Read it off the hourly forecast | Read it off the hourly forecast | **Cleanest outdoor window each day, suggested directly** |
+| Trustworthiness | Accuracy not published | Accuracy claimed, no figures | **Public track record: error by lead time, warning hit / false-alarm rates, reliability** |
+| Local patterns | — | City rankings, history | **Hour × month heatmap, pollution rose (source direction), weekday effect, exceedance days** |
+| Alerts outside the app | App notifications | App notifications | **Telegram / e-mail alerts when the level rises** (`alert.py`) |
+| Open & reproducible | Closed | Closed | **Open data (OpenAQ, Open-Meteo), open code, retrainable for any city** |
+
+Where they are stronger: every place on Earth, more stations and pollutants, a longer range and polished mobile apps.
+This system adds the decision layer: uncertainty, probability, timed warnings, reasons and a published track record.
 """)

@@ -1,0 +1,34 @@
+{
+  "mode": "live",
+  "city": "Amritsar",
+  "station": "Golden Temple, Amritsar - PPCB",
+  "sensor_id": [
+    15088,
+    12235443
+  ],
+  "location_id": 5551,
+  "station_forced": false,
+  "provider": "CPCB",
+  "lat": 31.62,
+  "lon": 74.876512,
+  "city_lat": 31.634,
+  "city_lon": 74.8723,
+  "tz": "Asia/Kolkata",
+  "qc": {
+    "raw_hours": 13294,
+    "out_of_range": 48,
+    "low_coverage": 214,
+    "stuck_values": 29,
+    "spikes": 35,
+    "grid_hours": 15095,
+    "gaps_filled": 696,
+    "still_missing": 1398,
+    "completeness_pct": 90.7
+  },
+  "fetched_at": "2026-11-09 20:53:47.475383+00:00",
+  "freshness": {
+    "last_observation": "2026-11-09 17:00:00+00:00",
+    "gap_hours": 3.0
+  },
+  "last_observation": "2026-11-09 17:00:00+00:00"
+}
