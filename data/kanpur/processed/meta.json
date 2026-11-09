@@ -25,13 +25,13 @@
     "still_missing": 1344,
     "completeness_pct": 91.1
   },
-  "fetched_at": "2026-11-09 20:52:38.565772+00:00",
+  "fetched_at": "2026-11-09 21:35:14.068395+00:00",
   "freshness": {
     "last_observation": "2026-11-09 14:00:00+00:00",
-    "gap_hours": 6.0,
+    "gap_hours": 7.0,
     "bridged": true,
     "bridge_ratio": 0.9912686183872629,
-    "bridged_until": "2026-11-09 20:00:00+00:00"
+    "bridged_until": "2026-11-09 21:00:00+00:00"
   },
   "last_observation": "2026-11-09 14:00:00+00:00"
 }

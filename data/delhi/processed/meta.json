@@ -3,8 +3,8 @@
   "city": "Delhi",
   "station": "Anand Vihar, New Delhi - DPCC",
   "sensor_id": [
-    12235610,
-    384
+    384,
+    12235610
   ],
   "location_id": 235,
   "station_forced": false,
@@ -15,20 +15,20 @@
   "city_lon": 77.209,
   "tz": "Asia/Kolkata",
   "qc": {
-    "raw_hours": 13382,
+    "raw_hours": 13383,
     "out_of_range": 0,
     "low_coverage": 475,
     "stuck_values": 48,
     "spikes": 3,
-    "grid_hours": 15092,
+    "grid_hours": 15093,
     "gaps_filled": 1001,
     "still_missing": 1235,
     "completeness_pct": 91.8
   },
-  "fetched_at": "2026-11-09 20:52:09.417858+00:00",
+  "fetched_at": "2026-11-09 21:33:02.422872+00:00",
   "freshness": {
-    "last_observation": "2026-11-09 16:00:00+00:00",
+    "last_observation": "2026-11-09 17:00:00+00:00",
     "gap_hours": 4.0
   },
-  "last_observation": "2026-11-09 16:00:00+00:00"
+  "last_observation": "2026-11-09 17:00:00+00:00"
 }
