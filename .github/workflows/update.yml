@@ -1,11 +1,9 @@
 # Keeps the deployed app fresh: every 3 hours it downloads the latest readings and
-# weather for every city that has a model, re-forecasts, sends a Telegram/e-mail alert
-# for Kolkata when the warning level rises, and commits the new files. Streamlit Cloud
-# redeploys automatically after each commit.
+# weather for every city that has a model, re-forecasts and commits
+# the new files. Streamlit Cloud redeploys automatically after each commit.
 #
 # Needs these repository secrets (Settings -> Secrets and variables -> Actions):
-#   OPENAQ_API_KEY                       required
-#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID optional, for alerts
+#   OPENAQ_API_KEY   required
 name: Update forecasts
 on:
   schedule:
@@ -22,8 +20,6 @@ jobs:
     timeout-minutes: 45
     env:
       OPENAQ_API_KEY: ${{ secrets.OPENAQ_API_KEY }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,9 +30,6 @@ jobs:
       - name: Update every city
         run: python pipeline.py update --all-cities
         continue-on-error: true          # one city's feed being down must not block the others
-      - name: Alert check (Kolkata)
-        run: python alert.py --city Kolkata --no-refresh
-        continue-on-error: true
       - name: Commit new data
         if: always()
         run: |

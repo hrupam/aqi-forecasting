@@ -28,14 +28,13 @@ The walkthrough follows the code as it stands in the project folder (13 Python f
 - [13. `aq/live.py`: live look-ups (no model needed)](#13-aq-live-py-live-look-ups-no-model-needed)
 - [14. `aq/ui.py`: the visual layer](#14-aq-ui-py-the-visual-layer)
 - [15. `app.py`: the Streamlit dashboard](#15-app-py-the-streamlit-dashboard)
-- [16. `alert.py`: scheduled notifications](#16-alert-py-scheduled-notifications)
-- [17. `aq/demo.py`: synthetic data for offline demos](#17-aq-demo-py-synthetic-data-for-offline-demos)
-- [18. Files the system produces (data contracts)](#18-files-the-system-produces-data-contracts)
-- [19. Evaluation and results](#19-evaluation-and-results)
-- [20. Design decisions and the bugs that shaped them](#20-design-decisions-and-the-bugs-that-shaped-them)
-- [21. Limitations and possible extensions](#21-limitations-and-possible-extensions)
-- [22. Glossary](#22-glossary)
-- [23. Likely viva questions, with answers](#23-likely-viva-questions-with-answers)
+- [16. `aq/demo.py`: synthetic data for offline demos](#16-aq-demo-py-synthetic-data-for-offline-demos)
+- [17. Files the system produces (data contracts)](#17-files-the-system-produces-data-contracts)
+- [18. Evaluation and results](#18-evaluation-and-results)
+- [19. Design decisions and the bugs that shaped them](#19-design-decisions-and-the-bugs-that-shaped-them)
+- [20. Limitations and possible extensions](#20-limitations-and-possible-extensions)
+- [21. Glossary](#21-glossary)
+- [22. Likely viva questions, with answers](#22-likely-viva-questions-with-answers)
 
 ---
 
@@ -116,8 +115,8 @@ This project adds all of these. Section 2.4 lists each gap and the code that fil
                              │
              ┌───────────────┴───────────────┐
              ▼                               ▼
-   app.py (Streamlit dashboard)       alert.py (Telegram / e-mail)
-   uses aq/insights.py, aq/ui.py      uses aq/insights.py
+   app.py (Streamlit dashboard)
+   uses aq/insights.py, aq/ui.py
 ```
 
 ### 2.2 Folder layout
@@ -127,7 +126,6 @@ This project adds all of these. Section 2.4 lists each gap and the code that fil
 | `config.py` | Settings, city list, per-city folder switching |
 | `pipeline.py` | Command-line entry point: fetch, train, forecast, update, all |
 | `app.py` | Streamlit dashboard |
-| `alert.py` | Scheduled notifier |
 | `aq/openaq.py` | OpenAQ API client |
 | `aq/openmeteo.py` | Open-Meteo weather and CAMS client |
 | `aq/dataset.py` | Quality control, merging, outage bridging |
@@ -141,7 +139,7 @@ This project adds all of these. Section 2.4 lists each gap and the code that fil
 | `data/<city>/processed/` | `hourly.csv`, `meta.json` |
 | `data/cities.json` | Searched / custom cities and pinned stations |
 | `models/<city>/` | `pm25_quantile_gbm.joblib` |
-| `reports/<city>/` | `forecast.csv`, `drivers.csv`, `backtest.json`, `backtest_predictions.csv`, `build.log`, `alert_state.json` |
+| `reports/<city>/` | `forecast.csv`, `drivers.csv`, `backtest.json`, `backtest_predictions.csv`, `build.log` |
 | `.streamlit/config.toml` | Dashboard theme |
 | `.env` | API key and alert settings (never committed) |
 
@@ -174,7 +172,6 @@ This project adds all of these. Section 2.4 lists each gap and the code that fil
 | No planning help | `insights.best_windows`, `daily_outlook` (× WHO, cigarettes) |
 | No accuracy record | `model.evaluate` (MAE by lead time, POD/FAR/CSI, Brier, reliability), Track record tab |
 | No local analysis | Patterns tab (heatmap, pollution rose, weekday effect, days above the limit) |
-| Fixed notifications | `alert.py` (Telegram/e-mail, escalation logic) |
 
 
 ---
@@ -214,7 +211,7 @@ This project adds all of these. Section 2.4 lists each gap and the code that fil
 * OpenAQ is asked only for the last few days per sensor (incremental download).
 * Then `run_forecast()` runs.
 
-It takes about a minute. This is what the dashboard's **Refresh** button and `alert.py` run.
+It takes about a minute. This is what the dashboard's **Refresh** button and the scheduled GitHub job run.
 
 ### 3.3 Opening the dashboard (`streamlit run app.py`)
 Streamlit runs `app.py` from top to bottom **on every interaction**. Each run:
@@ -689,7 +686,7 @@ $$L_\tau(u) = \max(\tau u,\ (\tau - 1)u)$$
    * CAMS enters only as its **predicted change** (`c_cams_change`, `c_cams24_change`), never as a level
 3. **Drop day-of-year.** With 1–3 years of data it only enables memorisation. Hour of day and weekday stay, because they repeat thousands of times.
 
-**Result:** the model now beats persistence at every lead time and beats CAMS by about 3× (section 19).
+**Result:** the model now beats persistence at every lead time and beats CAMS by about 3× (section 18).
 
 **Why this works:** the model now learns **physics-like rules**, such as "a falling mixing height tonight plus weak wind → PM rises about 40 %". These transfer across years, stations and calibration changes. Absolute levels don't transfer.
 
@@ -1208,26 +1205,7 @@ else                   → full dashboard (below)
 
 ---
 
-## 16. `alert.py`: scheduled notifications
-
-* **`RANK`** orders the levels: CLEAR 0 < WATCH 1 < WARNING 2 < EMERGENCY 3 (Unknown is −1).
-* **`send_telegram(text)`** posts to `https://api.telegram.org/bot<token>/sendMessage` with `chat_id`. It returns False if the channel isn't configured.
-* **`send_email(subject, text)`** sends over SMTP with STARTTLS (port 587 by default), logging in with `SMTP_USER`/`SMTP_PASSWORD`. A Gmail App Password works. It returns False if the channel isn't configured.
-* **`main()`**:
-  1. Arguments: `--threshold` (default 60), `--no-refresh`, `--demo`, `--city`.
-  2. Activates the city. Unless `--no-refresh`, runs `fetch(history=False)` and `run_forecast()`.
-  3. `alert_summary(fc, threshold)`, then compares with the saved state in `reports/<city>/alert_state.json`:
-     * **escalated** (level rank went up) → send
-     * **repeat due** (level is Warning or above and the last message was more than 12 h ago) → send again
-     * **de-escalated** → update the state silently
-  4. The message is `[City PM2.5] LEVEL: message`, plus the health advice for the peak category.
-  5. Prints which channels were used ("console only" if none).
-
-This avoids **alert fatigue**: users get a message when things get worse, not every 3 hours.
-
----
-
-## 17. `aq/demo.py`: synthetic data for offline demos
+## 16. `aq/demo.py`: synthetic data for offline demos
 
 **`_ar1(n, phi, sigma, rng)`** generates an AR(1) noise process, $x_t = \phi x_{t-1} + \varepsilon_t$. This is realistic "weather-like" persistence: random, but correlated over time.
 
@@ -1270,7 +1248,7 @@ $$\text{target} = 38 \cdot \text{season} \cdot \text{traffic} \cdot \text{ventil
 
 ---
 
-## 18. Files the system produces (data contracts)
+## 17. Files the system produces (data contracts)
 
 | File | Written by | Contents |
 |---|---|---|
@@ -1287,13 +1265,12 @@ $$\text{target} = 38 \cdot \text{season} \cdot \text{traffic} \cdot \text{ventil
 | `reports/<city>/forecast.csv` | `forecast` | 60 rows: `issue_time, target_time, h, cams, q10, q50, q90` |
 | `reports/<city>/drivers.csv` | `forecast` | `driver, effect_next24h, effect_24_48h` (µg/m³) |
 | `reports/<city>/build.log` | dashboard build | Output of a background `pipeline.py all` |
-| `reports/<city>/alert_state.json` | `alert.py` | `{level, time}` of the last notification |
 
 ---
 
-## 19. Evaluation and results
+## 18. Evaluation and results
 
-### 19.1 Kolkata (Padmapukur, Howrah station), forecasts issued April–September 2026
+### 18.1 Kolkata (Padmapukur, Howrah station), forecasts issued April–September 2026
 These scores come from re-training on the project's downloaded Kolkata data. MAE is in µg/m³; lower is better.
 
 | Lead time | 1 h | 3 h | 6 h | 12 h | 24 h | 36 h | 48 h | 60 h |
@@ -1322,7 +1299,7 @@ These scores come from re-training on the project's downloaded Kolkata data. MAE
 9. `w_dtemp24`
 10. `p_same_hour`
 
-### 19.2 How to read these results
+### 18.2 How to read these results
 * **At 1 hour the model equals persistence.** This is expected and correct, because the blend weight is small there. Nothing beats "it's about what it was an hour ago".
 * **The model's advantage grows with lead time.** Persistence errors grow quickly, while the model uses forecast weather and CAMS's expected change.
 * **CAMS has a large constant bias at this station.** That is exactly what a station-anchored model removes.
@@ -1331,7 +1308,7 @@ These scores come from re-training on the project's downloaded Kolkata data. MAE
 
 ---
 
-## 20. Design decisions and the bugs that shaped them
+## 19. Design decisions and the bugs that shaped them
 
 These came up while running the project on real data, and each one is worth knowing for a viva.
 
@@ -1356,7 +1333,7 @@ Further deliberate decisions:
 
 ---
 
-## 21. Limitations and possible extensions
+## 20. Limitations and possible extensions
 
 **Limitations:**
 * Forecast weather contains errors that grow after about 48 h, and the model inherits them.
@@ -1379,7 +1356,7 @@ Further deliberate decisions:
 
 ---
 
-## 22. Glossary
+## 21. Glossary
 
 | Term | Meaning |
 |---|---|
@@ -1414,7 +1391,7 @@ Further deliberate decisions:
 
 ---
 
-## 23. Likely viva questions, with answers
+## 22. Likely viva questions, with answers
 
 **Q1. Why did you use gradient boosting rather than a neural network such as an LSTM?**
 

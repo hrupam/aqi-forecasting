@@ -20,15 +20,14 @@ The system downloads real monitoring-station readings from **OpenAQ** and combin
 5. [Everyday use](#5-everyday-use)
 6. [Using the dashboard](#6-using-the-dashboard)
 7. [Working with multiple cities](#7-working-with-multiple-cities)
-8. [Automatic alerts (Telegram / e-mail)](#8-automatic-alerts-telegram--e-mail)
-9. [Deploying online (free)](#9-deploying-online-free)
-10. [How it works](#10-how-it-works)
-11. [Results](#11-results)
-12. [Project structure](#12-project-structure)
-13. [Configuration reference](#13-configuration-reference)
-14. [Troubleshooting](#14-troubleshooting)
-15. [Limitations and ideas for extension](#15-limitations-and-ideas-for-extension)
-16. [Data sources and licences](#16-data-sources-and-licences)
+8. [Deploying online (free)](#8-deploying-online-free)
+9. [How it works](#9-how-it-works)
+10. [Results](#10-results)
+11. [Project structure](#11-project-structure)
+12. [Configuration reference](#12-configuration-reference)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Limitations and ideas for extension](#14-limitations-and-ideas-for-extension)
+15. [Data sources and licences](#15-data-sources-and-licences)
 
 ---
 
@@ -38,7 +37,7 @@ The system downloads real monitoring-station readings from **OpenAQ** and combin
 |---|---|
 | **1. Collect and combine data** | Automatically downloads historical hourly PM2.5 from the nearest reliable OpenAQ station. It adds weather (temperature, humidity, wind, rain, cloud, radiation, pressure, mixing height) and the CAMS model forecast from Open-Meteo. The data is cleaned and everything is merged onto one hourly timeline. |
 | **2. Predict future air quality** | A gradient-boosting model learns how weather and recent pollution interact. It forecasts PM2.5 for every hour from 1 to 60 hours ahead, with an 80% uncertainty range and the probability of crossing any threshold. |
-| **3. Early-warning dashboard** | A Streamlit dashboard shows a colour strip of the next 48 hours, alert levels (Clear / Watch / Warning / Emergency), daily AQI outlook, best outdoor time, the reasons behind the forecast, and the model's track record. A separate script can send alerts to Telegram or e-mail. |
+| **3. Early-warning dashboard** | A Streamlit dashboard shows a colour strip of the next 48 hours, alert levels (Clear / Watch / Warning / Emergency), daily AQI outlook, best outdoor time, the reasons behind the forecast, and the model's track record. |
 
 ---
 
@@ -178,7 +177,6 @@ streamlit run app.py
 | `python pipeline.py update --all-cities` | The same for every city that has a model | Daily, or from a scheduled task |
 | `python pipeline.py train` | Retrains the model on all data so far and refreshes the track record | Weekly or monthly |
 | `python pipeline.py all --city X` | Full setup for a new city: download, train, forecast | Once per city |
-| `python alert.py --city X` | Updates the forecast and sends a Telegram/e-mail alert if the level rises | Every 3 hours, from a scheduled task |
 | `streamlit run app.py` | Starts the dashboard | Whenever you want to look |
 
 Add `--demo` to any `pipeline.py` command to use synthetic data.
@@ -256,48 +254,7 @@ A map, a ranking and a table with AQI now, AQI tomorrow and the 48-hour peak for
 
 ---
 
-## 8. Automatic alerts (Telegram / e-mail)
-
-`alert.py` refreshes the forecast and sends a message when the alert level **rises**, for example from Clear to Warning. The same warning is not repeated within 12 hours.
-
-```bat
-python alert.py --city Kolkata                 # sensitive-group threshold (60 µg/m³)
-python alert.py --city Delhi --threshold 90
-```
-
-**Telegram**
-1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
-2. Send your bot a message, then open `https://api.telegram.org/bot<token>/getUpdates` to find your `chat_id`.
-3. Add both to `.env`:
-   ```
-   TELEGRAM_BOT_TOKEN=123456:ABC...
-   TELEGRAM_CHAT_ID=123456789
-   ```
-
-**E-mail (Gmail example)**: create an App Password in your Google account, then add:
-```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=you@gmail.com
-SMTP_PASSWORD=your-app-password
-ALERT_EMAIL_TO=you@gmail.com
-```
-
-**Run it every 3 hours on Windows**
-1. Open **Task Scheduler → Create Task**.
-2. On the **Triggers** tab, set Daily, repeat every 3 hours.
-3. On the **Actions** tab:
-   * Program: `C:\Users\<you>\Documents\aqews\aqews\.venv\Scripts\python.exe`
-   * Arguments: `alert.py --city Kolkata`
-   * Start in: `C:\Users\<you>\Documents\aqews\aqews`
-
-On macOS/Linux, use cron: `0 */3 * * * cd /path/to/aqews && .venv/bin/python alert.py --city Kolkata`.
-
-**Or let GitHub run it.** Once the project is on GitHub, the scheduled job in section 9 checks for alerts every 3 hours without your computer being on.
-
----
-
-## 9. Deploying online (free)
+## 8. Deploying online (free)
 
 The dashboard runs on **Streamlit Community Cloud**, and a **GitHub Actions** job keeps every city up to date. Both are free.
 
@@ -307,7 +264,7 @@ GitHub repo (code + data + models) ──► Streamlit Community Cloud ──►
         └── GitHub Actions, every 3 h: update all cities, re-forecast, alert check, commit
 ```
 
-### 9.1 Put the project on GitHub
+### 8.1 Put the project on GitHub
 `data/`, `models/` and `reports/` are committed on purpose (about 70 MB): the deployed app reads them, and nothing is trained on the server.
 ```bat
 git add .
@@ -316,7 +273,7 @@ git push
 ```
 `requirements.txt` pins the exact package versions the models were trained with. If you retrain with newer packages, update the pins to match (`pip freeze`).
 
-### 9.2 Deploy the dashboard
+### 8.2 Deploy the dashboard
 1. Go to <https://share.streamlit.io>, sign in with GitHub and choose **Create app**.
 2. Pick the repository, branch `main`, main file `app.py`.
 3. **Advanced settings**:
@@ -332,15 +289,13 @@ Things to know about the free tier:
 * files written on the server (a Refresh, a city built from the dashboard) are lost when the app restarts; the scheduled job below is what keeps the published data fresh
 * building a new city on the server takes several minutes; for a city you want to keep, build it locally and push
 
-### 9.3 Keep it fresh: the scheduled job
+### 8.3 Keep it fresh: the scheduled job
 `.github/workflows/update.yml` runs every 3 hours. It:
 1. runs `python pipeline.py update --all-cities`
-2. runs `python alert.py --city Kolkata --no-refresh` (sends a Telegram message if the warning level rose)
-3. commits the new files, which makes Streamlit redeploy
+2. commits the new files, which makes Streamlit redeploy
 
-Add the secrets in GitHub under **Settings → Secrets and variables → Actions**:
+Add the secret in GitHub under **Settings → Secrets and variables → Actions**:
 * `OPENAQ_API_KEY` (required)
-* `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (optional, for alerts; see section 8)
 
 Start it once by hand from the **Actions** tab → **Update forecasts** → **Run workflow**.
 
@@ -348,18 +303,17 @@ Retrain from your own computer now and then (`python pipeline.py train --all-cit
 
 ---
 
-## 10. How it works
+## 9. How it works
 
 ```
  OpenAQ station PM2.5 ──┐
  Open-Meteo weather ────┼─► quality control ─► hourly merge ─► features ─► quantile models ─┬─► forecast.csv
  CAMS model PM2.5 ──────┘   (dataset.py)         (dataset.py)   (features.py)  (model.py)     ├─► drivers.csv
-                                                                                             ├─► backtest.json
-                                                                                             └─► alert.py
+                                                                                             └─► backtest.json
                                        Streamlit dashboard (app.py) reads everything in reports/<city>/
 ```
 
-### 10.1 Data collection (`aq/openaq.py`, `aq/openmeteo.py`)
+### 9.1 Data collection (`aq/openaq.py`, `aq/openmeteo.py`)
 * **OpenAQ v3**:
   * `/locations?coordinates=…&radius=…&parameters_id=2` finds the stations.
   * `/sensors/{id}/hours` gives hourly averages, downloaded in 120-day chunks with pagination and back-off on rate limits.
@@ -367,7 +321,7 @@ Retrain from your own computer now and then (`python pipeline.py train --all-cit
 * **Open-Meteo Air-Quality API**: CAMS PM2.5 history (from August 2022) and its 4-day forecast.
 * Downloads are **incremental**: later runs only fetch what is new.
 
-### 10.2 Quality control (`aq/dataset.py`)
+### 9.2 Quality control (`aq/dataset.py`)
 * **Removed readings**:
   * values ≤ 0 or above 1000 µg/m³
   * hours with less than 50% coverage
@@ -376,7 +330,7 @@ Retrain from your own computer now and then (`python pipeline.py train --all-cit
 * **Gap filling**: gaps of up to 3 hours are interpolated; longer gaps stay empty.
 * **Station outages**: if a station has stopped reporting for 6 hours to 14 days, the missing recent hours are **estimated from CAMS**, scaled by the station/CAMS ratio of the previous week. This lets forecasts still start from now. These estimates are never used for training, and the dashboard flags them.
 
-### 10.3 Features (`aq/features.py`)
+### 9.3 Features (`aq/features.py`)
 Each training example is a pair *(issue time T, lead time h)*. One model therefore covers the whole 1–60 h range without feeding its own errors back in.
 
 * **Known at T**:
@@ -393,7 +347,7 @@ Each training example is a pair *(issue time T, lead time h)*. One model therefo
 * **CAMS**: how much the regional model expects PM2.5 to change.
 * **Calendar**: hour of day and weekday in local time.
 
-### 10.4 Model (`aq/model.py`)
+### 9.4 Model (`aq/model.py`)
 * **Algorithm**: scikit-learn `HistGradientBoostingRegressor` with **quantile loss**, three models for the 10th, 50th and 90th percentiles.
 * **Target: the change from now**, log(1 + PM2.5 at T+h) − log(1 + PM2.5 at T), not the absolute level. Past-PM features are expressed relative to the current level too.
   * This keeps the forecast anchored to what the station measures today.
@@ -402,7 +356,7 @@ Each training example is a pair *(issue time T, lead time h)*. One model therefo
 * **Calibrated uncertainty**: split-conformal scaling widens or narrows the 10–90% band for each lead time, so it really contains the measured value about 80% of the time.
 * **Exceedance probability**: P(PM2.5 > threshold) comes from the calibrated quantiles, using a split-normal distribution in log space.
 
-### 10.5 Evaluation
+### 9.5 Evaluation
 * The **last 25% of the timeline** is held out. No training target falls inside it.
 * Alternate weeks of that period tune the blending and the band width. The other weeks are used for every reported score.
 * **Baselines**:
@@ -414,11 +368,11 @@ Each training example is a pair *(issue time T, lead time h)*. One model therefo
   * for warnings 24–48 h ahead at 60, 90 and 120 µg/m³: probability of detection (POD), false-alarm ratio (FAR), critical success index (CSI) and Brier score
   * a reliability diagram
 
-### 10.6 Explanations
+### 9.6 Explanations
 * **Global**: permutation importance of the inputs.
 * **For each forecast**: each weather group's inputs are replaced with their typical value for that month and hour, and the model is re-run. The change in the forecast (µg/m³) shows how much that factor is pushing pollution up or down today.
 
-### 10.7 AQI and categories (`aq/insights.py`)
+### 9.7 AQI and categories (`aq/insights.py`)
 * **India CPCB AQI** from 24-hour mean PM2.5 and PM10. The AQI is the higher of the two sub-indices.
 
 | Category | AQI | PM2.5 (µg/m³) |
@@ -438,7 +392,7 @@ Each training example is a pair *(issue time T, lead time h)*. One model therefo
 
 ---
 
-## 11. Results
+## 10. Results
 
 Out-of-sample results for every city with a model, after retraining on 9 November 2026. Each city is tested on the last 25 % of its own timeline (forecasts the model never saw while training), which now includes this autumn's polluted weeks. MAE is the mean absolute error in µg/m³; lower is better. "vs" columns show how much smaller our error is than the baseline.
 
@@ -464,18 +418,17 @@ Refresh this table after retraining: `python tools/summarize_results.py --markdo
 
 ---
 
-## 12. Project structure
+## 11. Project structure
 
 ```
 aqews/
 ├── app.py                  Streamlit dashboard (city picker, quick view, compare, full dashboard)
 ├── pipeline.py             Command line: fetch | train | forecast | update | all  (--city, --demo, ...)
-├── alert.py                Scheduled Telegram / e-mail notifier
 ├── tools/summarize_results.py  Collects every city's backtest into reports/summary_all_cities.json
-├── .github/workflows/update.yml  Scheduled job: update all cities + alert check every 3 h
+├── .github/workflows/update.yml  Scheduled job: update all cities every 3 h
 ├── config.py               Cities, folders, thresholds, model settings
 ├── requirements.txt        Python packages
-├── .env.example            Template for your API key and alert settings (copy to .env)
+├── .env.example            Template for your API key (copy to .env)
 ├── .streamlit/config.toml  Dashboard colour theme
 ├── aq/
 │   ├── openaq.py           OpenAQ v3 client (stations, hourly PM2.5)
@@ -498,7 +451,7 @@ aqews/
 
 ---
 
-## 13. Configuration reference
+## 12. Configuration reference
 
 ### `.env` (create it from `.env.example`)
 | Variable | Purpose |
@@ -507,8 +460,6 @@ aqews/
 | `AQ_CITY` | Default city for commands without `--city` (default: Kolkata) |
 | `AQ_SENSOR_ID` | Force a sensor for the default city (or use `--sensor`) |
 | `AQ_TRAIN_START` | First date of history to download (default: 2023-01-01) |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Telegram alerts |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_EMAIL_TO` | E-mail alerts |
 
 ### `config.py`
 | Setting | Default | Meaning |
@@ -525,7 +476,7 @@ aqews/
 
 ---
 
-## 14. Troubleshooting
+## 13. Troubleshooting
 
 | Problem | Fix |
 |---|---|
@@ -542,7 +493,7 @@ aqews/
 
 ---
 
-## 15. Limitations and ideas for extension
+## 14. Limitations and ideas for extension
 
 **Limitations**
 * Weather inputs at forecast time are themselves forecasts, so errors grow beyond about 48 h.
@@ -560,7 +511,7 @@ aqews/
 
 ---
 
-## 16. Data sources and licences
+## 15. Data sources and licences
 
 * **OpenAQ**: <https://openaq.org>, CC BY 4.0 (individual providers' licences apply; Indian data comes from CPCB and state pollution control boards)
 * **Open-Meteo** weather, air-quality and geocoding APIs: <https://open-meteo.com>, CC BY 4.0

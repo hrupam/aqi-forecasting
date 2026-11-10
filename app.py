@@ -786,7 +786,6 @@ with tabs[5]:
 | When to go out | Read it off the hourly forecast | Read it off the hourly forecast | **Cleanest outdoor window each day, suggested directly** |
 | Trustworthiness | Accuracy not published | Accuracy claimed, no figures | **Public track record: error by lead time, warning hit / false-alarm rates, reliability** |
 | Local patterns | — | City rankings, history | **Hour × month heatmap, pollution rose (source direction), weekday effect, exceedance days** |
-| Alerts outside the app | App notifications | App notifications | **Telegram / e-mail alerts when the level rises** (`alert.py`) |
 | Open & reproducible | Closed | Closed | **Open data (OpenAQ, Open-Meteo), open code, retrainable for any city** |
 
 Where they are stronger: every place on Earth, more stations and pollutants, a longer range and polished mobile apps.
