@@ -3,8 +3,8 @@
   "city": "Gurugram",
   "station": "R K Puram, Delhi - DPCC",
   "sensor_id": [
-    12234787,
-    35
+    35,
+    12234787
   ],
   "location_id": 17,
   "station_forced": false,
@@ -15,20 +15,20 @@
   "city_lon": 77.0266,
   "tz": "Asia/Kolkata",
   "qc": {
-    "raw_hours": 13385,
+    "raw_hours": 13396,
     "out_of_range": 0,
     "low_coverage": 295,
     "stuck_values": 0,
-    "spikes": 22,
-    "grid_hours": 15095,
-    "gaps_filled": 843,
+    "spikes": 20,
+    "grid_hours": 15106,
+    "gaps_filled": 841,
     "still_missing": 1189,
     "completeness_pct": 92.1
   },
-  "fetched_at": "2026-11-09 21:35:25.552921+00:00",
+  "fetched_at": "2026-11-10 07:20:55.820718+00:00",
   "freshness": {
-    "last_observation": "2026-11-09 17:00:00+00:00",
-    "gap_hours": 4.0
+    "last_observation": "2026-11-10 04:00:00+00:00",
+    "gap_hours": 3.0
   },
-  "last_observation": "2026-11-09 17:00:00+00:00"
+  "last_observation": "2026-11-10 04:00:00+00:00"
 }
