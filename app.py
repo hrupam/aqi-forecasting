@@ -123,9 +123,10 @@ def band_chart(fig, ymax):
     for name, hi, color in config.CATEGORIES:
         if lo >= ymax:
             break
-        fig.add_hrect(y0=lo, y1=min(hi, ymax), fillcolor=color, opacity=0.08, line_width=0,
-                      annotation_text=name, annotation_position="top left",
-                      annotation_font_size=10, annotation_font_color="#666")
+        top = min(hi, ymax)
+        fig.add_hrect(y0=lo, y1=top, fillcolor=color, opacity=0.08, line_width=0)
+        fig.add_annotation(xref="paper", x=1.005, xanchor="left", y=(lo + top) / 2, yanchor="middle",
+                           text=name, showarrow=False, font=dict(size=10, color="#666"))
         lo = hi
 
 
@@ -358,11 +359,12 @@ def render_quick(city):
         fig.add_trace(go.Scatter(x=stations.time.dt.tz_convert(config.LOCAL_TZ), y=stations.pm25, mode="markers",
                                  name="Station readings (latest)", text=stations.station,
                                  marker=dict(color="#1B2A41", size=9, symbol="diamond")))
-    fig.add_hline(y=threshold, line=dict(color="#c62828", dash="dash"),
-                  annotation_text=f"your threshold {threshold}", annotation_position="bottom right")
+    fig.add_hline(y=threshold, line=dict(color="#c62828", dash="dash"))
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", line=dict(color="#c62828", dash="dash"),
+                             name=f"Your threshold ({threshold})"))
     fig.add_vline(x=now.tz_convert(config.LOCAL_TZ), line=dict(color="#555", dash="dot"))
     fig.update_layout(height=430, yaxis_title="µg/m³", yaxis_range=[0, ymax], hovermode="x unified",
-                      margin=dict(t=30, b=10), legend=dict(orientation="h", y=1.08))
+                      margin=dict(t=30, b=10, r=90), legend=dict(orientation="h", y=1.08))
     st.plotly_chart(fig, width="stretch")
 
     d = cams.assign(day=loc.date).groupby("day").agg(pm25=("pm25", "mean"), pm10=("pm10", "mean"),
@@ -516,9 +518,10 @@ def add_category_bands(fig, ymax):
     for name, hi, color in config.CATEGORIES:
         if lo >= ymax:
             break
-        fig.add_hrect(y0=lo, y1=min(hi, ymax), fillcolor=color, opacity=0.08, line_width=0,
-                      annotation_text=name, annotation_position="top left",
-                      annotation_font_size=10, annotation_font_color="#666")
+        top = min(hi, ymax)
+        fig.add_hrect(y0=lo, y1=top, fillcolor=color, opacity=0.08, line_width=0)
+        fig.add_annotation(xref="paper", x=1.005, xanchor="left", y=(lo + top) / 2, yanchor="middle",
+                           text=name, showarrow=False, font=dict(size=10, color="#666"))
         lo = hi
 
 
@@ -542,11 +545,12 @@ with tabs[0]:
     if fc["cams"].notna().any():
         fig.add_trace(go.Scatter(x=fc.local_time, y=fc.cams, name="CAMS global model (what weather apps show)",
                                  line=dict(color="#888", dash="dot")))
-    fig.add_hline(y=threshold, line=dict(color="#c62828", dash="dash"),
-                  annotation_text=f"your alert threshold {threshold}", annotation_position="bottom right")
+    fig.add_hline(y=threshold, line=dict(color="#c62828", dash="dash"))
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", line=dict(color="#c62828", dash="dash"),
+                             name=f"Your alert threshold ({threshold})"))
     fig.add_vline(x=now.tz_convert(config.LOCAL_TZ), line=dict(color="#555", dash="dot"))
     fig.update_layout(height=470, yaxis_title="PM2.5 (µg/m³)", yaxis_range=[0, ymax], hovermode="x unified",
-                      margin=dict(t=30, b=10), legend=dict(orientation="h", y=1.08))
+                      margin=dict(t=30, b=10, r=90), legend=dict(orientation="h", y=1.08))
     st.plotly_chart(fig, width="stretch")
 
     up["p"] = exceed_prob(up.q10, up.q50, up.q90, threshold)
@@ -700,10 +704,13 @@ with tabs[3]:
             figr.add_trace(go.Scatter(x=[0, 1], y=[0, 1], line=dict(color="#aaa", dash="dash"), name="perfect"))
             figr.add_trace(go.Scatter(x=rel.forecast_prob, y=rel.observed_freq, mode="lines+markers",
                                       name="model", marker=dict(size=np.clip(np.sqrt(rel.n) / 3, 6, 22))))
-            figr.update_layout(height=340, title="Reliability: when we say X%, does it happen X% of the time? (>90)",
+            figr.update_layout(height=340, title="Reliability of the warning chances (PM2.5 > 90)",
                                xaxis_title="Forecast probability", yaxis_title="Observed frequency",
-                               margin=dict(t=40))
+                               xaxis_range=[-0.03, 1.03], yaxis_range=[-0.03, 1.05],
+                               margin=dict(t=40), legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center"))
             c1.plotly_chart(figr, width="stretch")
+            c1.caption("When we say X %, does it happen X % of the time? Points on the dashed line are perfect; "
+                       "below it means we warned more often than needed. Bigger dots = more forecasts.")
         if btp is not None:
             hsel = c2.selectbox("Lead time to inspect", sorted(btp.h.unique()), index=min(4, btp.h.nunique() - 1))
             s = btp[btp.h == hsel].sort_values("target_time")
@@ -715,9 +722,13 @@ with tabs[3]:
                                      y=np.nan, q10=np.nan, q50=np.nan, q90=np.nan)
                 s = pd.concat([s, fill]).sort_values("target_time")
             figb = go.Figure()
-            figb.add_trace(go.Scatter(x=s.target_time, y=s.q90, line=dict(width=0), showlegend=False))
-            figb.add_trace(go.Scatter(x=s.target_time, y=s.q10, fill="tonexty", line=dict(width=0),
-                                      fillcolor="rgba(47,111,222,0.16)", name="80% range"))
+            seg = s.q10.isna().cumsum()      # the NaN rows inserted above separate the stretches
+            for k, (_, part) in enumerate(s[s.q10.notna()].groupby(seg[s.q10.notna()])):
+                figb.add_trace(go.Scatter(x=part.target_time, y=part.q90, line=dict(width=0), showlegend=False,
+                                          legendgroup="band", hoverinfo="skip"))
+                figb.add_trace(go.Scatter(x=part.target_time, y=part.q10, fill="tonexty", line=dict(width=0),
+                                          fillcolor="rgba(47,111,222,0.16)", name="80% range",
+                                          legendgroup="band", showlegend=k == 0, hoverinfo="skip"))
             figb.add_trace(go.Scatter(x=s.target_time, y=s.q50, name=f"Forecast {hsel} h ahead",
                                       line=dict(color="#2F6FDE")))
             figb.add_trace(go.Scatter(x=s.target_time, y=s.y, name="Measured", line=dict(color="#1B2A41")))
