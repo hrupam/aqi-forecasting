@@ -624,13 +624,27 @@ with tabs[2]:
     if "blh" in w and w["blh"].notna().any():
         figw.add_trace(go.Scatter(x=wl, y=w.wind_speed * w.blh, name="Ventilation index (wind × mixing height, m²/s)",
                                   line=dict(color="#00897b")))
-    figw.add_trace(go.Bar(x=wl, y=w.precip, name="Rain (mm/h)", yaxis="y2", marker_color="#5c6bc0"))
+    rain = w["precip"].fillna(0) if "precip" in w else pd.Series(0.0, index=w.index)
+    has_rain = bool((rain > 0.05).any())                      # ignore traces below 0.05 mm/h
+    if has_rain:
+        figw.add_trace(go.Bar(x=wl, y=rain, name="Rain (mm/h)", yaxis="y2", marker_color="#5c6bc0", opacity=0.85))
     figw.add_hrect(y0=0, y1=2000, fillcolor="#e53935", opacity=0.07, line_width=0,
                    annotation_text="stagnant (< 2000)", annotation_position="top left")
-    figw.update_layout(height=320, yaxis=dict(title="m²/s"), margin=dict(t=10),
-                       yaxis2=dict(title="mm/h", overlaying="y", side="right", showgrid=False),
-                       legend=dict(orientation="h", y=1.12))
+    now_local = now.tz_convert(config.LOCAL_TZ)
+    if wl.min() <= now_local <= wl.max():                     # past on the left, forecast on the right
+        figw.add_vline(x=now_local, line=dict(color="#555", dash="dot"))
+        figw.add_annotation(x=now_local, y=1, yref="paper", text="now", showarrow=False,
+                            xanchor="left", yanchor="top", xshift=4, font=dict(size=11, color="#555"))
+    figw.update_layout(height=340, yaxis=dict(title="Ventilation (m²/s)", rangemode="tozero"),
+                       margin=dict(t=10, r=80 if has_rain else 20), legend=dict(orientation="h", y=1.12))
+    if has_rain:
+        figw.update_layout(yaxis2=dict(title=dict(text="Rain (mm/h)", standoff=8), overlaying="y", side="right",
+                                       showgrid=False, zeroline=False, rangemode="tozero",
+                                       range=[0, max(1.0, float(rain.max()) * 1.15)], tickformat=".1f",
+                                       automargin=True))
     st.plotly_chart(figw, width="stretch")
+    if not has_rain:
+        st.caption("No rain in this period, so nothing is washing particles out of the air.")
 
     if backtest and backtest.get("importance"):
         imp = pd.Series(backtest["importance"]).head(12)[::-1]
