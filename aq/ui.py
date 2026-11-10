@@ -31,7 +31,7 @@ html, body, .stApp, [data-testid="stMarkdownContainer"], .stTextInput input, .st
 .stApp {{ background: {SKY}; color: {INK}; }}
 h1, h2, h3, h4 {{ font-family: {DISPLAY} !important; color: {INK}; letter-spacing: -0.01em; }}
 h2 {{ font-size: 1.45rem !important; }} h3 {{ font-size: 1.2rem !important; }}
-.block-container {{ padding-top: 1.6rem; max-width: 1280px; }}
+.block-container {{ padding-top: 4.2rem; max-width: 1280px; }}   /* clear Streamlit's top bar */
 #MainMenu, footer {{ visibility: hidden; }}
 section[data-testid="stSidebar"] {{ background: {PAPER}; border-right: 1px solid {LINE}; }}
 section[data-testid="stSidebar"] h2 {{ font-size: 1.05rem !important; margin-top: .4rem; }}
@@ -55,12 +55,15 @@ section[data-testid="stSidebar"] h2 {{ font-size: 1.05rem !important; margin-top
 :focus-visible {{ outline: 2px solid {SIGNAL} !important; outline-offset: 2px; }}
 
 /* hero */
-.hero {{ background: {INK}; color: #fff; border-radius: 18px; padding: 26px 28px 18px; margin: 4px 0 18px; }}
-.hero-top {{ display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }}
-.hero-place h1 {{ color: #fff !important; font-size: clamp(2rem, 4.2vw, 3.1rem) !important; font-weight: 800;
-  margin: 0; padding: 0; line-height: 1.02; }}
+.hero {{ background: {INK}; color: #fff; border-radius: 18px; padding: 26px 28px 18px; margin: 12px 0 18px; }}
+.hero-top {{ display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: nowrap; }}
+.hero-place {{ flex: 1 1 auto; min-width: 0; }}
+.hero-place h1 {{ color: #fff !important; font-size: clamp(1.9rem, 3.8vw, 3rem) !important; font-weight: 800;
+  margin: 0; padding: 0; line-height: 1.05; overflow-wrap: anywhere; }}
+.hero-place .region {{ display: block; font-family: {DISPLAY}; font-weight: 600; font-size: clamp(1rem, 1.6vw, 1.2rem);
+  color: #C9D4E3; margin-top: 4px; }}
 .hero-place p {{ color: #B7C3D3; margin: 6px 0 0; font-size: .95rem; }}
-.hero-aqi {{ text-align: right; }}
+.hero-aqi {{ flex: 0 0 auto; text-align: right; }}
 .hero-aqi .num {{ font-family: {DISPLAY}; font-weight: 800; font-size: clamp(2.8rem, 6vw, 4.4rem); line-height: .9;
   color: var(--cat); }}
 .hero-aqi .cat {{ display: block; font-weight: 700; font-size: 1.05rem; color: #fff; margin-top: 4px; }}
@@ -94,7 +97,7 @@ section[data-testid="stSidebar"] h2 {{ font-size: 1.05rem !important; margin-top
 .day .big small {{ font-family: {BODY}; font-size: .85rem; font-weight: 400; color: {HAZE}; }}
 .day p {{ margin: 6px 0 0; font-size: .9rem; color: #33445C; }}
 .note {{ color: {HAZE}; font-size: .86rem; }}
-@media (max-width: 640px) {{ .hero {{ padding: 18px; }} .hero-aqi {{ text-align: left; }} }}
+@media (max-width: 640px) {{ .hero {{ padding: 18px; }} .hero-top {{ flex-wrap: wrap; }} .hero-aqi {{ text-align: left; }} }}
 </style>
 """
 
@@ -144,10 +147,13 @@ def hero(place: str, subline: str, aqi_value: float, aqi_cat: str, aqi_color: st
     legend = "".join(f'<i style="background:{c}"></i>{_esc(nm)}' for nm, _, c in CATEGORIES)
     lv = LEVEL_COLORS.get(level, HAZE)
     num = "–" if not np.isfinite(aqi_value) else f"{aqi_value:.0f}"
+    # Long searched names ("Bārāsat, North 24 Parganas, West Bengal, India"): big town name, smaller region line
+    town, _, region = str(place).partition(",")
+    region_html = f'<span class="region">{_esc(region.strip())}</span>' if region.strip() else ""
     return f"""
 <div class="hero">
   <div class="hero-top">
-    <div class="hero-place"><h1>{_esc(place)}</h1><p>{_esc(subline)}</p></div>
+    <div class="hero-place"><h1>{_esc(town.strip())}</h1>{region_html}<p>{_esc(subline)}</p></div>
     <div class="hero-aqi" style="--cat:{aqi_color}"><span class="num">{num}</span>
       <span class="cat">{_esc(aqi_cat)}</span><span class="lbl">{_esc(aqi_label)}</span></div>
   </div>
