@@ -733,9 +733,13 @@ with tabs[4]:
     c1, c2 = st.columns(2)
     hm = h.pivot_table(index="hour", columns="month", values="pm25", aggfunc="mean")
     figh = go.Figure(go.Heatmap(z=hm.values, x=[pd.Timestamp(2000, m, 1).strftime("%b") for m in hm.columns],
-                                y=hm.index, colorscale="YlOrRd", colorbar=dict(title="µg/m³")))
+                                y=hm.index, colorscale="YlOrRd",
+                                colorbar=dict(title=dict(text="µg/m³", side="top"), thickness=14, len=0.9,
+                                              ticks="outside", tickformat=".0f", nticks=6),
+                                hovertemplate="%{x}, %{y}:00 IST<br>%{z:.0f} µg/m³<extra></extra>"))
+    # Wide right margin: the chart template's 20 px cut the colour-scale labels (150 showed as "15").
     figh.update_layout(height=420, title="Typical PM2.5 by hour of day and month", yaxis_title="Hour (IST)",
-                       margin=dict(t=40))
+                       margin=dict(t=40, r=80))
     c1.plotly_chart(figh, width="stretch")
 
     if "wind_dir" in h and h["wind_dir"].notna().any():
