@@ -759,11 +759,19 @@ with tabs[4]:
         names = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
         rose = hw.pm25.groupby(sector).mean().reindex(range(8))
         figr = go.Figure(go.Barpolar(r=rose.values, theta=names, marker_color=rose.values,
-                                     marker_colorscale="YlOrRd"))
-        figr.update_layout(height=420, title="Pollution rose: mean PM2.5 by wind direction (where dirty air comes from)",
-                           margin=dict(t=60),
-                           polar=dict(angularaxis=dict(rotation=90, direction="clockwise")))   # compass: N up, E right
+                                     marker_colorscale="YlOrRd",
+                                     marker_colorbar=dict(title=dict(text="µg/m³", side="top"), thickness=14,
+                                                          len=0.9, tickformat=".0f", nticks=6),
+                                     hovertemplate="Wind from %{theta}<br>%{r:.0f} µg/m³<extra></extra>"))
+        # Short title so it fits half the page; the radial numbers are hidden (they sat on the E spoke)
+        # and the colour bar gives the scale instead.
+        figr.update_layout(height=420, title="Pollution rose: PM2.5 by wind direction",
+                           margin=dict(t=50, l=40, r=80, b=30),
+                           polar=dict(angularaxis=dict(rotation=90, direction="clockwise"),   # compass: N up, E right
+                                      radialaxis=dict(showticklabels=False, ticks="")))
         c2.plotly_chart(figr, width="stretch")
+        c2.caption("Each slice is the wind blowing *from* that direction; darker and longer = dirtier air "
+                   "arrives from there.")
 
     daily_obs = h.pm25.resample("D").mean()
     ex = (daily_obs > config.NAAQS_24H).groupby(daily_obs.index.to_period("M")).sum()
