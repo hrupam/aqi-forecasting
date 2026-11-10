@@ -603,10 +603,16 @@ with tabs[2]:
         dd = drivers.melt(id_vars="driver", var_name="period", value_name="effect")
         dd["period"] = dd["period"].map({"effect_next24h": "Next 24 h", "effect_24_48h": "24–48 h"})
         figd = go.Figure()
-        for per, color in (("Next 24 h", "#90caf9"), ("24–48 h", "#2F6FDE")):
+        # 24–48 h is added first so that, within each row, "Next 24 h" is drawn on top;
+        # the legend is reversed to match and sits below the chart, clear of the toolbar.
+        for per, color in (("24–48 h", "#2F6FDE"), ("Next 24 h", "#90caf9")):
             s = dd[dd.period == per]
             figd.add_trace(go.Bar(y=s.driver, x=s.effect, name=per, orientation="h", marker_color=color))
-        figd.update_layout(height=340, barmode="group", xaxis_title="µg/m³ vs a typical day", margin=dict(t=10))
+        figd.update_layout(height=380, barmode="group", xaxis_title="µg/m³ vs a typical day",
+                           margin=dict(t=10, b=10),
+                           legend=dict(orientation="h", traceorder="reversed", x=0.5, xanchor="center",
+                                       y=-0.3, yanchor="top"))
+        figd.update_xaxes(zeroline=True, zerolinecolor="#9AA8BA", zerolinewidth=1)
         st.plotly_chart(figd, width="stretch")
         for s in I.driver_sentences(drivers) or ["No single weather factor stands out - conditions are near typical."]:
             st.markdown(f"- {s}")
