@@ -676,8 +676,9 @@ with tabs[3]:
         k2.metric("Error 24–48 h (MAE)", f"{b['mae_model']:.1f} µg/m³",
                   f"{b['skill_vs_persistence']:+.0%} vs persistence")
         if "skill_vs_cams" in b:
-            k3.metric("Better than CAMS (24–48 h)", f"{b['skill_vs_cams']:+.0%}", "lower error than global model")
-        k4.metric("80% range really contains truth", f"{b['coverage_80']:.0%}", "target 80%", delta_color="off")
+            k3.metric("Better than CAMS (24–48 h)", f"{b['skill_vs_cams']:+.0%}", "lower error", help="How much lower our error is than CAMS, the global model weather apps use.")
+        k4.metric("Inside 80% range", f"{b['coverage_80']:.0%}", "target 80%", delta_color="off",
+                  help="Share of measured values that fell inside our 80% range. Close to 80% means the range is honest.")
 
         bh = pd.DataFrame(backtest["by_horizon"])
         fig = go.Figure()
@@ -781,12 +782,11 @@ with tabs[4]:
     st.plotly_chart(fige, width="stretch")
 
     wk = h.groupby("dow").pm25.mean()
-    c1, c2 = st.columns(2)
-    c1.plotly_chart(go.Figure(go.Bar(x=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], y=wk.values,
-                                     marker_color="#546e7a")).update_layout(
-        height=280, title="Weekday effect (traffic & activity)", margin=dict(t=40)), width="stretch")
-    c2.markdown("**Data quality report**")
-    c2.json(meta.get("qc", {}))
+    st.plotly_chart(go.Figure(go.Bar(x=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], y=wk.values,
+                                     marker_color="#546e7a",
+                                     hovertemplate="%{x}: %{y:.0f} µg/m³<extra></extra>")).update_layout(
+        height=280, title="Weekday effect (traffic & activity)", yaxis_title="Mean PM2.5 (µg/m³)",
+        margin=dict(t=40)), width="stretch")
 
 # ------------------------------------------------------------------ tab 6: comparison
 with tabs[5]:

@@ -461,7 +461,7 @@ Steps, in order:
 3. **Stop if nothing is left.** If every reading is now missing, the function stops with a clear message.
 4. **Reindex to a complete hourly grid**, from the first to the last reading.
 5. **Interpolate only short gaps** (`limit=3`, `limit_area="inside"`). A missing hour or two is filled with a straight line; longer gaps stay empty. Inventing hours of pollution would teach the model fake dynamics, and gradient boosting handles missing values natively anyway.
-6. **Return the report** used by the dashboard's data-quality panel:
+6. **Return the report** saved in `data/<city>/processed/meta.json` under `qc`:
    * `raw_hours`
    * counts for each rule
    * `grid_hours`, `gaps_filled`, `still_missing`, `completeness_pct`
@@ -1200,7 +1200,7 @@ else                   → full dashboard (below)
 | **Plan your day** | Day cards from `daily_outlook`; the **best outdoor window** per day from `best_windows`, with how much cleaner it is than the worst slot; an hour-by-hour table; **CSV download** (`st.download_button`) |
 | **Why** | Grouped horizontal bars of the driver effects (next 24 h vs 24–48 h) plus plain sentences; a **ventilation-index** line with the stagnant zone (< 2,000 m²/s) shaded and rain bars on a second axis; the top 12 **permutation importances** with a key to the prefixes |
 | **Track record** | Error tiles (0–24 h, 24–48 h, skill against persistence and CAMS, band coverage); **MAE by lead time** for the model and the three baselines; warning verification table (POD, FAR, CSI, Brier); **reliability diagram** (marker size ∝ √n); last 30 days of test forecasts against measurements, for a selectable lead time |
-| **Patterns** | **Heatmap** of mean PM2.5 by local hour × month; **pollution rose**: wind direction binned into 8 sectors with `((dir + 22.5) // 45) % 8`, mean PM2.5 per sector on a `Barpolar` chart, showing where dirty air comes from; days per month with a 24-h mean above 60; **weekday effect**; the data-quality JSON |
+| **Patterns** | **Heatmap** of mean PM2.5 by local hour × month; **pollution rose**: wind direction binned into 8 sectors with `((dir + 22.5) // 45) % 8`, mean PM2.5 per sector on a `Barpolar` chart, showing where dirty air comes from; days per month with a 24-h mean above 60; **weekday effect** |
 | **Compared with weather apps** | The gap table (section 2.4) |
 
 ---
