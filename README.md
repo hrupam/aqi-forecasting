@@ -208,7 +208,7 @@ Add `--demo` to any `pipeline.py` command to use synthetic data.
 | **Forecast** | Measured PM2.5 for the last 4 days and the forecast with its 80% band, against CPCB colour bands. The CAMS line shows what weather apps would show. Below it, the hourly probability of exceeding your threshold. |
 | **Plan your day** | Daily cards (24-h mean, category, × WHO guideline, cigarette equivalent, chance above the national limit), the cleanest daytime window for outdoor activity, an hour-by-hour table and a CSV download. |
 | **Why** | How much each factor (wind, mixing height, rain, temperature/humidity, regional pollution) pushes the forecast above or below a typical day. Also a ventilation and rain chart, and the model's most important inputs. |
-| **Track record** | Out-of-sample error by lead time compared with simple baselines and CAMS, warning hit rate and false alarms, a reliability diagram, and the last 30 days of test forecasts against measurements. |
+| **Track record** | Out-of-sample error by lead time compared with simple baselines and CAMS, a reliability diagram, and the last 30 days of test forecasts against measurements. |
 | **Patterns** | Hour × month heatmap, pollution rose, days per month above the national limit, weekday effect. |
 | **Compared with weather apps** | The comparison table from section 2. |
 

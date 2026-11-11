@@ -692,12 +692,6 @@ with tabs[3]:
                           margin=dict(t=10), legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig, width="stretch")
 
-        st.subheader("How good are the warnings? (24–48 h ahead, warn when chance ≥ 50%)")
-        al = pd.DataFrame(backtest["alerts"]).T.reset_index().rename(columns={"index": "Threshold µg/m³"})
-        al = al.rename(columns={"events": "Event hours", "POD": "Caught (POD)", "FAR": "False alarms (FAR)",
-                                "CSI": "CSI", "brier": "Brier score"})
-        st.dataframe(al, hide_index=True, width="stretch")
-
         c1, c2 = st.columns(2)
         rel = pd.DataFrame(backtest.get("reliability", []))
         if not rel.empty:
