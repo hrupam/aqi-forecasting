@@ -696,13 +696,13 @@ with tabs[3]:
         rel = pd.DataFrame(backtest.get("reliability", []))
         if not rel.empty:
             figr = go.Figure()
-            figr.add_trace(go.Scatter(x=[0, 1], y=[0, 1], line=dict(color="#aaa", dash="dash"), name="perfect"))
+            figr.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", line=dict(color="#aaa", dash="dash"), name="perfect"))
             figr.add_trace(go.Scatter(x=rel.forecast_prob, y=rel.observed_freq, mode="lines+markers",
                                       name="model", marker=dict(size=np.clip(np.sqrt(rel.n) / 3, 6, 22))))
             figr.update_layout(height=340, title="Reliability of the warning chances (PM2.5 > 90)",
                                xaxis_title="Forecast probability", yaxis_title="Observed frequency",
-                               xaxis_range=[-0.03, 1.03], yaxis_range=[-0.03, 1.05],
-                               margin=dict(t=40), legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center"))
+                               xaxis=dict(range=[-0.03, 1.05], dtick=0.2), yaxis=dict(range=[-0.03, 1.05], dtick=0.2),
+                               margin=dict(t=40, r=30), legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center"))
             c1.plotly_chart(figr, width="stretch")
             c1.caption("When we say X %, does it happen X % of the time? Points on the dashed line are perfect; "
                        "below it means we warned more often than needed. Bigger dots = more forecasts.")
@@ -719,16 +719,17 @@ with tabs[3]:
             figb = go.Figure()
             seg = s.q10.isna().cumsum()      # the NaN rows inserted above separate the stretches
             for k, (_, part) in enumerate(s[s.q10.notna()].groupby(seg[s.q10.notna()])):
-                figb.add_trace(go.Scatter(x=part.target_time, y=part.q90, line=dict(width=0), showlegend=False,
+                figb.add_trace(go.Scatter(x=part.target_time, y=part.q90, mode="lines", line=dict(width=0), showlegend=False,
                                           legendgroup="band", hoverinfo="skip"))
-                figb.add_trace(go.Scatter(x=part.target_time, y=part.q10, fill="tonexty", line=dict(width=0),
+                figb.add_trace(go.Scatter(x=part.target_time, y=part.q10, mode="lines", fill="tonexty", line=dict(width=0),
                                           fillcolor="rgba(47,111,222,0.16)", name="80% range",
                                           legendgroup="band", showlegend=k == 0, hoverinfo="skip"))
-            figb.add_trace(go.Scatter(x=s.target_time, y=s.q50, name=f"Forecast {hsel} h ahead",
+            figb.add_trace(go.Scatter(x=s.target_time, y=s.q50, mode="lines", name=f"Forecast {hsel} h ahead",
                                       line=dict(color="#2F6FDE")))
-            figb.add_trace(go.Scatter(x=s.target_time, y=s.y, name="Measured", line=dict(color="#1B2A41")))
-            figb.update_layout(height=340, title="Last 30 days of the test period", margin=dict(t=40),
-                               legend=dict(orientation="h", y=-0.2))
+            figb.add_trace(go.Scatter(x=s.target_time, y=s.y, mode="lines", name="Measured", line=dict(color="#1B2A41")))
+            figb.update_layout(height=340, title="Last 30 days of the test period", margin=dict(t=40, r=30),
+                               yaxis_title="PM2.5 (µg/m³)", hovermode="x unified",
+                               legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
             c2.plotly_chart(figb, width="stretch")
 
 # ------------------------------------------------------------------ tab 5: insights
