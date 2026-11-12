@@ -3,8 +3,8 @@
   "city": "Kanpur",
   "station": "Nehru Nagar, Kanpur - UPPCB",
   "sensor_id": [
-    12235513,
-    15183
+    15183,
+    12235513
   ],
   "location_id": 5662,
   "station_forced": false,
@@ -15,20 +15,20 @@
   "city_lon": 80.3319,
   "tz": "Asia/Kolkata",
   "qc": {
-    "raw_hours": 13331,
+    "raw_hours": 13342,
     "out_of_range": 0,
     "low_coverage": 249,
     "stuck_values": 66,
     "spikes": 35,
-    "grid_hours": 15143,
+    "grid_hours": 15154,
     "gaps_filled": 815,
     "still_missing": 1341,
-    "completeness_pct": 91.1
+    "completeness_pct": 91.2
   },
-  "fetched_at": "2026-11-11 21:57:46.541362+00:00",
+  "fetched_at": "2026-11-12 07:12:21.821697+00:00",
   "freshness": {
-    "last_observation": "2026-11-11 17:00:00+00:00",
-    "gap_hours": 4.0
+    "last_observation": "2026-11-12 04:00:00+00:00",
+    "gap_hours": 3.0
   },
-  "last_observation": "2026-11-11 17:00:00+00:00"
+  "last_observation": "2026-11-12 04:00:00+00:00"
 }
