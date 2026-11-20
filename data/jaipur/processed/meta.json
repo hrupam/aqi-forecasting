@@ -3,8 +3,8 @@
   "city": "Jaipur",
   "station": "Police Commissionerate, Jaipur - RSPCB",
   "sensor_id": [
-    14971,
-    12234805
+    12234805,
+    14971
   ],
   "location_id": 5633,
   "station_forced": false,
@@ -15,20 +15,20 @@
   "city_lon": 75.7873,
   "tz": "Asia/Kolkata",
   "qc": {
-    "raw_hours": 13610,
+    "raw_hours": 13619,
     "out_of_range": 84,
     "low_coverage": 237,
     "stuck_values": 88,
     "spikes": 12,
-    "grid_hours": 15341,
+    "grid_hours": 15350,
     "gaps_filled": 683,
     "still_missing": 1409,
     "completeness_pct": 90.8
   },
-  "fetched_at": "2026-11-20 02:25:51.010713+00:00",
+  "fetched_at": "2026-11-20 11:31:01.869840+00:00",
   "freshness": {
-    "last_observation": "2026-11-19 23:00:00+00:00",
+    "last_observation": "2026-11-20 08:00:00+00:00",
     "gap_hours": 3.0
   },
-  "last_observation": "2026-11-19 23:00:00+00:00"
+  "last_observation": "2026-11-20 08:00:00+00:00"
 }
