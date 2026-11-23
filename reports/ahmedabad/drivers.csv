@@ -1,6 +1,6 @@
 driver,effect_next24h,effect_24_48h
-Wind (speed & direction),-2.0318677247903207,-0.9041082169169078
-Mixing height (atmospheric lid),-2.8544876447058893,-1.5438101455299809
+Wind (speed & direction),-2.4151058135337053,0.07098926835410246
+Mixing height (atmospheric lid),-3.0100154660912195,0.4446651733014025
 Rain & clouds,0.0,0.0
-"Temperature, humidity & pressure",0.8800116860262138,-4.291533584587196
-Regional pollution (CAMS model),-0.30118152629004324,-0.608705265687548
+"Temperature, humidity & pressure",-0.904917788626537,-6.852780614823054
+Regional pollution (CAMS model),-0.7519128210040433,-0.9901715395418605
