@@ -3,8 +3,8 @@
   "city": "Siliguri",
   "station": "Ward-32 Bapupara, Siliguri - WBPCB",
   "sensor_id": [
-    12234993,
-    15079
+    15079,
+    12234993
   ],
   "location_id": 5648,
   "station_forced": false,
@@ -15,20 +15,20 @@
   "city_lon": 88.3953,
   "tz": "Asia/Kolkata",
   "qc": {
-    "raw_hours": 13719,
+    "raw_hours": 13726,
     "out_of_range": 31,
     "low_coverage": 193,
     "stuck_values": 83,
     "spikes": 4,
-    "grid_hours": 15519,
-    "gaps_filled": 616,
+    "grid_hours": 15527,
+    "gaps_filled": 617,
     "still_missing": 1465,
     "completeness_pct": 90.6
   },
-  "fetched_at": "2026-11-27 12:14:50.257941+00:00",
+  "fetched_at": "2026-11-27 21:14:12.791898+00:00",
   "freshness": {
-    "last_observation": "2026-11-27 09:00:00+00:00",
-    "gap_hours": 3.0
+    "last_observation": "2026-11-27 17:00:00+00:00",
+    "gap_hours": 4.0
   },
-  "last_observation": "2026-11-27 09:00:00+00:00"
+  "last_observation": "2026-11-27 17:00:00+00:00"
 }
