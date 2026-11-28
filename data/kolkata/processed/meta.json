@@ -15,20 +15,20 @@
   "city_lon": 88.3639,
   "tz": "Asia/Kolkata",
   "qc": {
-    "raw_hours": 14014,
+    "raw_hours": 14020,
     "out_of_range": 14,
     "low_coverage": 205,
     "stuck_values": 34,
     "spikes": 5,
-    "grid_hours": 15527,
+    "grid_hours": 15533,
     "gaps_filled": 563,
     "still_missing": 1189,
     "completeness_pct": 92.3
   },
-  "fetched_at": "2026-11-27 21:11:40.131370+00:00",
+  "fetched_at": "2026-11-28 03:18:12.164760+00:00",
   "freshness": {
-    "last_observation": "2026-11-27 17:00:00+00:00",
+    "last_observation": "2026-11-27 23:00:00+00:00",
     "gap_hours": 4.0
   },
-  "last_observation": "2026-11-27 17:00:00+00:00"
+  "last_observation": "2026-11-27 23:00:00+00:00"
 }
